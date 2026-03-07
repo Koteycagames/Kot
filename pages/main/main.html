@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KotoGram</title>
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div class="telegram-layout">
+        
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <button id="menu-btn" class="icon-btn">☰</button>
+                <div class="search-bar">
+                    <input type="text" placeholder="Поиск...">
+                </div>
+            </header>
+            
+            <div class="chat-list" id="chat-list">
+                <div class="empty-text" id="empty-chat-list">Нет чатов. Нажмите на карандаш.</div>
+            </div>
+
+            <button id="new-chat-fab" class="fab">✎</button>
+        </aside>
+
+        <main class="chat-area">
+            <div id="no-chat-selected" class="no-chat-selected">
+                <span>Выберите чат, чтобы начать общение</span>
+            </div>
+
+            <div id="active-chat-container" class="active-chat-container" style="display: none;">
+                <header class="chat-header">
+                    <div class="chat-info">
+                        <div class="chat-avatar" id="current-chat-avatar">К</div>
+                        <div class="chat-title-container">
+                            <h2 id="current-chat-name">Имя контакта</h2>
+                            <span id="current-chat-phone">номер телефона</span>
+                        </div>
+                    </div>
+                    <button class="icon-btn">⋮</button>
+                </header>
+
+                <div class="chat-messages" id="chat-messages">
+                    </div>
+
+                <footer class="chat-input-area">
+                    <input type="file" id="image-input" accept="image/*" style="display: none;">
+                    <button id="attach-btn" class="icon-btn">📎</button>
+                    <input type="text" id="message-input" placeholder="Написать сообщение..." autocomplete="off">
+                    <button id="send-btn" class="icon-btn send-btn">➤</button>
+                </footer>
+            </div>
+        </main>
+
+        <div id="new-chat-modal" class="modal">
+            <div class="modal-content">
+                <h3>Новый чат</h3>
+                <p>Введите номер телефона пользователя (с плюсом и кодом), чтобы начать с ним диалог.</p>
+                <input type="tel" id="new-contact-phone" placeholder="+380... или +7...">
+                <div class="modal-buttons">
+                    <button id="cancel-new-chat" class="btn-cancel">Отмена</button>
+                    <button id="confirm-new-chat" class="btn-primary">Начать чат</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="side-menu" class="side-menu">
+            <div class="menu-header">
+                <div class="avatar-placeholder" id="user-avatar">К</div>
+                <div class="user-info">
+                    <h2 id="user-name">Загрузка...</h2>
+                    <p id="user-phone">...</p>
+                </div>
+            </div>
+            <ul class="menu-items">
+                <li id="nav-logout" class="danger">🚪 Выйти</li>
+            </ul>
+        </div>
+        <div id="menu-overlay" class="overlay"></div>
+
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
