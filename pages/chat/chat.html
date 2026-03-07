@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Чат | KotoGram</title>
+    <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <button id="back-btn" class="icon-btn">⬅</button>
+            <div class="chat-info">
+                <div class="chat-avatar" id="chat-avatar">Г</div>
+                <div class="chat-title-container">
+                    <h2 id="chat-title">Общий чат</h2>
+                    <span id="chat-status">В сети</span>
+                </div>
+            </div>
+            <button class="icon-btn">⋮</button>
+        </header>
+
+        <main class="chat-messages" id="chat-messages">
+            </main>
+
+        <footer class="chat-input-area">
+            <input type="file" id="image-input" accept="image/*" style="display: none;">
+            
+            <button id="attach-btn" class="icon-btn attach-btn">📎</button>
+            <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off">
+            <button id="send-btn" class="icon-btn send-btn">➤</button>
+        </footer>
+    </div>
+
+    <script type="module" src="chat.js"></script>
+</body>
+</html>
