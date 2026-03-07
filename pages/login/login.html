@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход | KotoGram</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+    <div class="auth-container">
+        <h1>Вход в KotoGram</h1>
+        
+        <div id="step-1">
+            <p>Введите номер телефона в международном формате (например, +380... или +7...)</p>
+            <input type="tel" id="phone-number" placeholder="+1234567890">
+            <button id="send-code-btn">Получить код</button>
+        </div>
+
+        <div id="step-2" style="display: none;">
+            <p>Введите код из SMS</p>
+            <input type="text" id="verification-code" placeholder="123456">
+            <button id="verify-code-btn">Войти</button>
+        </div>
+
+        <div id="recaptcha-container"></div>
+    </div>
+
+    <script type="module" src="login.js"></script>
+</body>
+</html>
