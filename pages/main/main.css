@@ -1,25 +1,467 @@
-/* --- Адаптация для мобильных телефонов --- */
+:root {
+    --primary-color: #3390ec;
+    --primary-hover: #2a7ac8;
+    --bg-color: #f4f4f5;
+    --sidebar-bg: #ffffff;
+    --chat-bg: #e6ebf0; /* Легкий серо-голубой фон чата */
+    --text-color: #000000;
+    --text-secondary: #707579;
+    --border-color: #dfe1e5;
+    --message-sent-bg: #eef7de; /* Зеленоватый как в Telegram */
+    --message-received-bg: #ffffff;
+    --hover-bg: #f4f4f5;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    color: var(--text-color);
+}
+
+.app-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    background-color: var(--sidebar-bg);
+}
+
+/* --- ЛЕВАЯ ПАНЕЛЬ (SIDEBAR) --- */
+.sidebar {
+    width: 350px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    background-color: var(--sidebar-bg);
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    height: 60px;
+}
+
+.search-container {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-color);
+    border-radius: 22px;
+    padding: 8px 15px;
+    margin-left: 10px;
+}
+
+.search-icon {
+    color: var(--text-secondary);
+    font-size: 20px;
+    margin-right: 8px;
+}
+
+#search-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    font-size: 15px;
+    color: var(--text-color);
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.icon-btn:hover {
+    background-color: var(--hover-bg);
+    color: var(--primary-color);
+}
+
+.chat-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-top: 5px;
+}
+
+/* Стилизация скроллбара */
+.chat-list::-webkit-scrollbar,
+.messages-container::-webkit-scrollbar {
+    width: 6px;
+}
+.chat-list::-webkit-scrollbar-thumb,
+.messages-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 10px;
+}
+
+.chat-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.chat-item:hover {
+    background-color: var(--hover-bg);
+}
+
+.chat-item.active {
+    background-color: var(--primary-color);
+}
+
+.chat-item.active .chat-item-name,
+.chat-item.active .chat-item-last-msg {
+    color: #ffffff;
+}
+
+.avatar-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 15px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.avatar-placeholder img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.chat-item-info {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.chat-item-name {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-item-last-msg {
+    font-size: 14px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.info-message {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* Профиль внизу панели */
+.current-user-profile {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+}
+
+.current-user-profile .avatar-placeholder {
+    width: 40px;
+    height: 40px;
+}
+
+.my-info {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.my-info h4 {
+    font-size: 15px;
+    margin-bottom: 2px;
+}
+
+.my-info span {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* --- ПРАВАЯ ПАНЕЛЬ (CHAT AREA) --- */
+.chat-area {
+    flex-grow: 1;
+    height: 100%;
+    background-color: var(--chat-bg);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.no-chat-selected {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+}
+
+.no-chat-content {
+    background-color: rgba(255, 255, 255, 0.5);
+    padding: 20px 30px;
+    border-radius: 20px;
+    text-align: center;
+}
+
+.no-chat-content p {
+    margin-top: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.active-chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+.chat-header {
+    height: 60px;
+    background-color: var(--sidebar-bg);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    flex-shrink: 0;
+}
+
+.back-btn {
+    display: none; /* Скрыта на десктопе */
+    margin-right: 15px;
+}
+
+.chat-info {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+}
+
+.chat-avatar {
+    width: 40px;
+    height: 40px;
+    margin-right: 12px;
+}
+
+.chat-details h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.chat-status {
+    font-size: 13px;
+    color: var(--primary-color); /* Или text-secondary для offline */
+}
+
+/* --- СООБЩЕНИЯ --- */
+.messages-container {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.message-wrapper {
+    display: flex;
+    margin-bottom: 15px;
+    width: 100%;
+}
+
+.message-wrapper.sent {
+    justify-content: flex-end;
+}
+
+.message-wrapper.received {
+    justify-content: flex-start;
+}
+
+.message-bubble {
+    max-width: 65%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    word-wrap: break-word;
+}
+
+.message-wrapper.sent .message-bubble {
+    background-color: var(--message-sent-bg);
+    border-bottom-right-radius: 4px;
+}
+
+.message-wrapper.received .message-bubble {
+    background-color: var(--message-received-bg);
+    border-bottom-left-radius: 4px;
+}
+
+.message-text {
+    font-size: 15px;
+    line-height: 1.4;
+    margin-bottom: 4px;
+}
+
+.message-image {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.message-time {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: right;
+    display: block;
+}
+
+.message-wrapper.sent .message-time {
+    color: rgba(0, 0, 0, 0.4);
+}
+
+/* --- ВВОД СООБЩЕНИЯ --- */
+.chat-input-area {
+    background-color: var(--sidebar-bg);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#message-input {
+    flex-grow: 1;
+    border: none;
+    background-color: var(--bg-color);
+    padding: 12px 15px;
+    border-radius: 20px;
+    font-size: 15px;
+    resize: none;
+    outline: none;
+    margin: 0 10px;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.send-btn {
+    color: var(--primary-color);
+}
+
+.send-btn:hover {
+    background-color: transparent;
+    transform: scale(1.1);
+}
+
+/* --- МОДАЛЬНОЕ ОКНО ПРЕДПРОСМОТРА КАРТИНКИ --- */
+.image-preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: var(--sidebar-bg);
+    padding: 20px;
+    border-radius: 12px;
+    max-width: 90%;
+    max-height: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.close-modal-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+}
+
+.close-modal-btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+}
+
+#preview-image {
+    max-width: 100%;
+    max-height: 60vh;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    object-fit: contain;
+}
+
+/* --- АДАПТАЦИЯ ДЛЯ ПЛАНШЕТОВ И МОБИЛОК --- */
 @media (max-width: 768px) {
     .sidebar {
         width: 100%;
-        max-width: 100%;
-        border-right: none;
-        z-index: 20; /* Выдвигаем список чатов поверх всего */
+        /* На мобилке сайдбар занимает 100% ширины, если не открыт чат */
     }
-    
+
     .chat-area {
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        z-index: 10;
-        display: none; /* Скрываем чат, пока он не выбран */
+        z-index: 100;
+        /* По умолчанию на мобилке чат скрыт (уведен вправо), пока не выбран контакт */
+        transform: translateX(100%);
+        transition: transform 0.3s ease-in-out;
+        background-color: var(--chat-bg);
     }
 
-    /* Когда чат открыт, он будет перекрывать список */
+    /* Класс, который будет добавляться через JS при клике на контакт */
     .chat-area.active-mobile {
-        display: flex;
-        z-index: 30;
+        transform: translateX(0);
+    }
+
+    .back-btn {
+        display: flex; /* Показываем кнопку "Назад" */
+    }
+
+    .no-chat-selected {
+        display: none; /* На мобилке заглушка не нужна, там просто сайдбар на весь экран */
     }
 }
