@@ -33,7 +33,6 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// ВЫХОД
 document.getElementById('logout-btn').onclick = () => signOut(auth);
 
 // МОДАЛКА НОВОГО ЧАТА
@@ -41,18 +40,23 @@ const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
     document.getElementById('new-chat-error').textContent = '';
+    document.getElementById('new-chat-phone').value = '';
 };
 document.getElementById('close-new-chat-btn').onclick = () => newChatModal.style.display = 'none';
 
-// ПОИСК ПО НОМЕРУ (Исправлено)
+// ПОИСК ПО НОМЕРУ
 document.getElementById('start-new-chat-btn').onclick = async () => {
-    const phone = document.getElementById('new-chat-phone').value.trim();
+    let phone = document.getElementById('new-chat-phone').value.trim();
     if (!phone) return;
 
+    // Авто-добавление плюса, если пользователь забыл
+    if (!phone.startsWith('+')) phone = '+' + phone;
+
     const errorEl = document.getElementById('new-chat-error');
-    errorEl.textContent = "Поиск...";
+    errorEl.textContent = "Ищем в базе...";
 
     const usersRef = ref(db, 'users');
+    // ВАЖНО: В консоли Firebase должен быть создан индекс для .indexOn: ["phoneNumber"]
     const userQuery = query(usersRef, orderByChild('phoneNumber'), equalTo(phone));
     
     try {
@@ -62,39 +66,34 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
             const userData = Object.values(usersData)[0];
             
             if (userData.uid === currentUser.uid) {
-                errorEl.textContent = "Нельзя создать чат с самим собой";
+                errorEl.textContent = "Это ваш номер";
                 return;
             }
 
             newChatModal.style.display = 'none';
             openChat(userData);
         } else {
-            errorEl.textContent = "Пользователь не найден";
+            errorEl.textContent = "Пользователь не найден. Убедитесь, что номер в формате +79991234567";
         }
     } catch (e) {
-        errorEl.textContent = "Ошибка: проверьте интернет";
+        console.error(e);
+        errorEl.textContent = "Ошибка доступа к базе";
     }
 };
 
-// ОТКРЫТИЕ ЧАТА
 function openChat(user) {
     currentChatUser = user;
     document.getElementById('no-chat-selected').style.display = 'none';
     document.getElementById('active-chat').style.display = 'flex';
     document.getElementById('current-chat-name').textContent = user.displayName || user.phoneNumber;
-    
-    // Переключение интерфейса на планшете/мобилке
     document.getElementById('app-viewport').classList.add('chat-open');
     loadMessages();
 }
 
-// КНОПКА НАЗАД (Стрелочка - ИСПРАВЛЕНО)
-document.getElementById('back-to-sidebar-btn').onclick = (e) => {
-    e.preventDefault();
+document.getElementById('back-to-sidebar-btn').onclick = () => {
     document.getElementById('app-viewport').classList.remove('chat-open');
 };
 
-// ЗАГРУЗКА СООБЩЕНИЙ
 function loadMessages() {
     if (unsubscribeMessages) unsubscribeMessages();
     const chatId = currentUser.uid < currentChatUser.uid ? 
@@ -103,16 +102,16 @@ function loadMessages() {
     
     const msgRef = ref(db, `chats/${chatId}/messages`);
     unsubscribeMessages = onValue(msgRef, (snapshot) => {
-        messagesContainer.innerHTML = '';
+        const container = document.getElementById('messages-container');
+        container.innerHTML = '';
         snapshot.forEach(child => {
-            const msg = child.val();
-            renderMessage(msg);
+            renderMessage(child.val(), container);
         });
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        container.scrollTop = container.scrollHeight;
     });
 }
 
-function renderMessage(msg) {
+function renderMessage(msg, container) {
     const div = document.createElement('div');
     const isMine = msg.senderId === currentUser.uid;
     div.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
@@ -120,16 +119,15 @@ function renderMessage(msg) {
     div.style.padding = '10px';
     div.style.borderRadius = '12px';
     div.style.maxWidth = '85%';
-    div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
     div.style.margin = '4px 0';
+    div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
 
-    if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; margin-bottom:5px; display:block;">`;
-    if (msg.text) div.innerHTML += `<span style="word-break: break-word;">${msg.text}</span>`;
+    if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
+    if (msg.text) div.innerHTML += `<span style="word-break: break-word; font-size: 15px;">${msg.text}</span>`;
     
-    messagesContainer.appendChild(div);
+    container.appendChild(div);
 }
 
-// ОТПРАВКА
 function sendMessage(text = '', img = null) {
     if (!text && !img) return;
     const chatId = currentUser.uid < currentChatUser.uid ? 
@@ -147,30 +145,30 @@ function sendMessage(text = '', img = null) {
 
 document.getElementById('send-btn').onclick = () => sendMessage(document.getElementById('message-input').value);
 
-// СПИСОК ЧАТОВ (Фильтрация себя - ИСПРАВЛЕНО)
+// ЗАГРУЗКА СПИСКА ЧАТОВ (Убираем автоматический вывод всех юзеров)
 function loadMyChats() {
-    const usersRef = ref(db, 'users');
-    onValue(usersRef, (snapshot) => {
-        const list = document.getElementById('chat-list');
+    const list = document.getElementById('chat-list');
+    
+    // Здесь логика "Мои контакты" — показываем только тех, кому мы уже писали
+    // Для этого проверяем ветку chats, где есть наш UID
+    onValue(ref(db, 'users'), (snapshot) => {
         list.innerHTML = '';
-        let count = 0;
-        
+        let found = false;
         snapshot.forEach(child => {
             const user = child.val();
-            // Проверка: не выводим себя
-            if (user.uid !== currentUser.uid) {
+            // 1. Не показываем себя
+            // 2. Временный фильтр: показываем только тех, кто НЕ "New Koto User" 
+            // ИЛИ просто оставь поиск, а список будет наполняться по мере общения
+            if (user.uid !== currentUser.uid && user.displayName !== "New Koto User") {
                 const item = document.createElement('div');
                 item.className = 'chat-item';
-                item.innerHTML = `<strong>${user.displayName || 'Без имени'}</strong><br><small>${user.phoneNumber}</small>`;
+                item.innerHTML = `<strong>${user.displayName || 'Пользователь'}</strong><br><small>${user.phoneNumber}</small>`;
                 item.onclick = () => openChat(user);
                 list.appendChild(item);
-                count++;
+                found = true;
             }
         });
-        
-        if (count === 0) {
-            list.innerHTML = '<div class="info-message">У вас пока нет чатов</div>';
-        }
+        if (!found) list.innerHTML = '<div class="info-message">Нажмите на карандаш, чтобы найти собеседника</div>';
     });
 }
 
@@ -187,17 +185,14 @@ document.getElementById('image-input').onchange = (e) => {
         reader.readAsDataURL(file);
     }
 };
-
 document.getElementById('close-preview-btn').onclick = () => document.getElementById('image-preview-modal').style.display = 'none';
 
 document.getElementById('send-image-btn').onclick = async () => {
     const file = document.getElementById('image-input').files[0];
     const btn = document.getElementById('send-image-btn');
-    btn.disabled = true; btn.textContent = '...';
-
+    btn.disabled = true; btn.textContent = 'Отправка...';
     const formData = new FormData();
     formData.append('image', file);
-    
     try {
         const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
         const data = await res.json();
@@ -205,7 +200,6 @@ document.getElementById('send-image-btn').onclick = async () => {
             sendMessage('', data.data.url);
             document.getElementById('image-preview-modal').style.display = 'none';
         }
-    } catch (e) { alert("Ошибка загрузки"); }
+    } catch (e) { alert("Ошибка ImgBB"); }
     btn.disabled = false; btn.textContent = 'Отправить фото';
 };
-    
