@@ -1,39 +1,343 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getDatabase, ref, get, set, push, onValue, onChildAdded, update, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { 
+    getAuth, 
+    onAuthStateChanged, 
+    signOut 
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { 
+    getDatabase, 
+    ref, 
+    onValue, 
+    push, 
+    set, 
+    serverTimestamp, 
+    get 
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
+// Конфигурация Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
-  authDomain: "kotogram-9b0b9.firebaseapp.com",
-  databaseURL: "https://kotogram-9b0b9-default-rtdb.firebaseio.com",
-  projectId: "kotogram-9b0b9",
-  storageBucket: "kotogram-9b0b9.firebasestorage.app",
-  messagingSenderId: "755607509917",
-  appId: "1:755607509917:web:29b1b85eea516bde702d74"
+    apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
+    authDomain: "kotogram-9b0b9.firebaseapp.com",
+    databaseURL: "https://kotogram-9b0b9-default-rtdb.firebaseio.com",
+    projectId: "kotogram-9b0b9",
+    storageBucket: "kotogram-9b0b9.firebasestorage.app",
+    messagingSenderId: "755607509917",
+    appId: "1:755607509917:web:29b1b85eea516bde702d74"
 };
+
+const IMGBB_API_KEY = "706ffb03d5653cdf91990abac2ce7a29";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const IMGBB_API_KEY = "706ffb03d5653cdf91990abac2ce7a29";
 
+// Глобальные переменные состояния
 let currentUser = null;
-let currentChatId = null;
-let activeChatListener = null;
+let currentChatUser = null;
+let currentMessagesRef = null;
+let unsubscribeMessages = null;
+let selectedImageFile = null;
 
-// Элементы UI
-const chatListEl = document.getElementById('chat-list');
-const emptyChatListEl = document.getElementById('empty-chat-list');
-const noChatSelectedEl = document.getElementById('no-chat-selected');
-const activeChatContainer = document.getElementById('active-chat-container');
-const chatMessagesEl = document.getElementById('chat-messages');
+// DOM Элементы
+const chatList = document.getElementById('chat-list');
+const myDisplayName = document.getElementById('my-display-name');
+const myPhoneNumber = document.getElementById('my-phone-number');
+const logoutBtn = document.getElementById('logout-btn');
 
-// Модалка нового чата
-const newChatModal = document.getElementById('new-chat-modal');
-const newChatFab = document.getElementById('new-chat-fab');
-const cancelNewChatBtn = document.getElementById('cancel-new-chat');
-const confirmNewChatBtn = document.getElementById('confirm-new-chat');
-const newContactPhoneInput = document.getElementById('new-contact-phone');
+const chatArea = document.getElementById('chat-area');
+const noChatSelected = document.getElementById('no-chat-selected');
+const activeChat = document.getElementById('active-chat');
+const backToSidebarBtn = document.getElementById('back-to-sidebar-btn');
+
+const currentChatName = document.getElementById('current-chat-name');
+const currentChatStatus = document.getElementById('current-chat-status');
+const messagesContainer = document.getElementById('messages-container');
+
+const messageInput = document.getElementById('message-input');
+const sendBtn = document.getElementById('send-btn');
+const attachBtn = document.getElementById('attach-btn');
+const imageInput = document.getElementById('image-input');
+
+const imagePreviewModal = document.getElementById('image-preview-modal');
+const closePreviewBtn = document.getElementById('close-preview-btn');
+const previewImage = document.getElementById('preview-image');
+const sendImageBtn = document.getElementById('send-image-btn');
+const searchInput = document.getElementById('search-input');
+
+// Проверка авторизации
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        loadMyProfile();
+        loadUsers();
+    } else {
+        window.location.href = "../login/login.html";
+    }
+});
+
+// Выход из аккаунта
+logoutBtn.addEventListener('click', () => {
+    signOut(auth).then(() => {
+        window.location.href = "../login/login.html";
+    }).catch((error) => {
+        console.error("Ошибка при выходе:", error);
+    });
+});
+
+// Загрузка своего профиля
+function loadMyProfile() {
+    const myRef = ref(db, 'users/' + currentUser.uid);
+    onValue(myRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            myDisplayName.textContent = data.displayName || "Без имени";
+            myPhoneNumber.textContent = data.phoneNumber || currentUser.phoneNumber;
+        }
+    });
+}
+
+// Загрузка списка пользователей
+function loadUsers() {
+    const usersRef = ref(db, 'users');
+    onValue(usersRef, (snapshot) => {
+        chatList.innerHTML = '';
+        const users = [];
+        snapshot.forEach((childSnapshot) => {
+            const user = childSnapshot.val();
+            if (user.uid !== currentUser.uid) {
+                users.push(user);
+            }
+        });
+
+        if (users.length === 0) {
+            chatList.innerHTML = '<div class="info-message">Нет доступных контактов</div>';
+            return;
+        }
+
+        renderUserList(users);
+    });
+}
+
+// Отрисовка списка пользователей
+function renderUserList(users) {
+    chatList.innerHTML = '';
+    const filterText = searchInput.value.toLowerCase();
+    
+    users.forEach(user => {
+        const name = user.displayName || user.phoneNumber || "Пользователь";
+        if (filterText && !name.toLowerCase().includes(filterText) && !user.phoneNumber.includes(filterText)) {
+            return;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'chat-item';
+        div.onclick = () => openChat(user, div);
+
+        div.innerHTML = `
+            <div class="avatar-placeholder">
+                <span class="material-icons">person</span>
+            </div>
+            <div class="chat-item-info">
+                <div class="chat-item-name">${name}</div>
+                <div class="chat-item-last-msg">${user.phoneNumber}</div>
+            </div>
+        `;
+        chatList.appendChild(div);
+    });
+}
+
+// Поиск по контактам
+searchInput.addEventListener('input', () => {
+    // Перезагружаем список из кеша Firebase
+    const usersRef = ref(db, 'users');
+    get(usersRef).then((snapshot) => {
+        const users = [];
+        snapshot.forEach((child) => {
+            const u = child.val();
+            if (u.uid !== currentUser.uid) users.push(u);
+        });
+        renderUserList(users);
+    });
+});
+
+// Генерация уникального ID для чата (сортируем UID, чтобы ID был одинаковым для обоих)
+function getChatId(uid1, uid2) {
+    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+}
+
+// Открытие чата с пользователем
+function openChat(user, element) {
+    currentChatUser = user;
+    
+    // Подсветка активного чата в списке
+    document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+
+    // Обновляем шапку чата
+    currentChatName.textContent = user.displayName || user.phoneNumber;
+    currentChatStatus.textContent = user.status === 'online' ? 'В сети' : 'Был(а) недавно';
+
+    // Показываем область чата
+    noChatSelected.style.display = 'none';
+    activeChat.style.display = 'flex';
+    
+    // Для мобильных устройств: открываем чат поверх списка
+    chatArea.classList.add('active-mobile');
+
+    // Загрузка сообщений
+    loadMessages();
+}
+
+// Возврат к списку чатов (для мобилок)
+backToSidebarBtn.addEventListener('click', () => {
+    chatArea.classList.remove('active-mobile');
+});
+
+// Загрузка сообщений
+function loadMessages() {
+    if (unsubscribeMessages) {
+        unsubscribeMessages(); // Отписываемся от предыдущего чата
+    }
+
+    const chatId = getChatId(currentUser.uid, currentChatUser.uid);
+    const messagesRef = ref(db, `chats/${chatId}/messages`);
+    
+    unsubscribeMessages = onValue(messagesRef, (snapshot) => {
+        messagesContainer.innerHTML = '';
+        snapshot.forEach((childSnapshot) => {
+            const msg = childSnapshot.val();
+            renderMessage(msg);
+        });
+        // Скроллим вниз
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    });
+}
+
+// Отрисовка одного сообщения
+function renderMessage(msg) {
+    const isSent = msg.senderId === currentUser.uid;
+    const wrapper = document.createElement('div');
+    wrapper.className = `message-wrapper ${isSent ? 'sent' : 'received'}`;
+
+    let contentHtml = '';
+    if (msg.imageUrl) {
+        contentHtml += `<img src="${msg.imageUrl}" class="message-image" alt="Изображение">`;
+    }
+    if (msg.text) {
+        contentHtml += `<div class="message-text">${msg.text}</div>`;
+    }
+
+    const timeString = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+    contentHtml += `<span class="message-time">${timeString}</span>`;
+
+    wrapper.innerHTML = `<div class="message-bubble">${contentHtml}</div>`;
+    messagesContainer.appendChild(wrapper);
+}
+
+// Отправка текстового сообщения
+function sendMessage(text, imageUrl = null) {
+    if (!text && !imageUrl) return;
+    if (!currentChatUser) return;
+
+    const chatId = getChatId(currentUser.uid, currentChatUser.uid);
+    const messagesRef = ref(db, `chats/${chatId}/messages`);
+    const newMessageRef = push(messagesRef);
+
+    set(newMessageRef, {
+        senderId: currentUser.uid,
+        text: text,
+        imageUrl: imageUrl,
+        timestamp: serverTimestamp()
+    });
+
+    messageInput.value = '';
+    messageInput.style.height = 'auto'; // Сброс высоты textarea
+}
+
+// Обработка кнопки отправки
+sendBtn.addEventListener('click', () => {
+    const text = messageInput.value.trim();
+    sendMessage(text);
+});
+
+// Отправка по Enter (но Shift+Enter - перенос строки)
+messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const text = messageInput.value.trim();
+        sendMessage(text);
+    }
+});
+
+// Авторазмер textarea
+messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
+// Работа с картинками: открытие выбора файла
+attachBtn.addEventListener('click', () => {
+    imageInput.click();
+});
+
+// Выбор файла и открытие модального окна предпросмотра
+imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        selectedImageFile = file;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            imagePreviewModal.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+    }
+    // Сбрасываем input, чтобы можно было выбрать тот же файл еще раз
+    imageInput.value = ''; 
+});
+
+// Закрытие превью
+closePreviewBtn.addEventListener('click', () => {
+    imagePreviewModal.style.display = 'none';
+    selectedImageFile = null;
+    previewImage.src = '';
+});
+
+// Отправка картинки через ImgBB API
+sendImageBtn.addEventListener('click', () => {
+    if (!selectedImageFile) return;
+
+    sendImageBtn.disabled = true;
+    sendImageBtn.textContent = 'Загрузка...';
+
+    const formData = new FormData();
+    formData.append("image", selectedImageFile);
+
+    fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const imageUrl = result.data.url;
+            sendMessage('', imageUrl);
+            imagePreviewModal.style.display = 'none';
+        } else {
+            alert("Ошибка загрузки изображения");
+        }
+    })
+    .catch(error => {
+        console.error("Ошибка ImgBB:", error);
+        alert("Ошибка сети при загрузке изображения");
+    })
+    .finally(() => {
+        sendImageBtn.disabled = false;
+        sendImageBtn.textContent = 'Отправить картинку';
+        selectedImageFile = null;
+        previewImage.src = '';
+    });
+});
 
 // Авторизация
 onAuthStateChanged(auth, (user) => {
