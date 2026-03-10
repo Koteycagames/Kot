@@ -59,13 +59,13 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// Настройка reCAPTCHA
-window.recaptchaVerifier = new RecaptchaVerifier(auth, 'send-code-btn', {
+// ПРАВИЛЬНАЯ настройка reCAPTCHA для Firebase v9 (auth идет последним аргументом!)
+window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
     'size': 'invisible',
     'callback': (response) => {
         // reCAPTCHA пройдена успешно
     }
-});
+}, auth);
 
 // Шаг 1: Отправка СМС-кода
 sendCodeBtn.addEventListener('click', () => {
@@ -141,7 +141,6 @@ verifyBtn.addEventListener('click', () => {
                 }
             }).catch((err) => {
                 showError("Ошибка чтения БД: " + err.message);
-                // Даже при ошибке БД пытаемся пустить внутрь
                 window.location.href = "../main/main.html";
             });
         })
