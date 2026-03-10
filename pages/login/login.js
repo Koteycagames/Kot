@@ -1,40 +1,63 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { 
-    getAuth, 
-    RecaptchaVerifier, 
-    signInWithPhoneNumber,
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { 
-    getDatabase, 
-    ref, 
-    get, 
-    set 
-} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KotoGram - Вход</title>
+    <link rel="stylesheet" href="login.css">
+    
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            alert("ОШИБКА HTML/ЗАГРУЗКИ:\n" + message + "\nСтрока: " + lineno);
+            return true;
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            alert("ОШИБКА ПРОМИСА (ВОЗМОЖНО ИМПОРТ):\n" + event.reason);
+        });
+    </script>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo">
+                <h1>KotoGram</h1>
+            </div>
+            
+            <h2 id="auth-title">Вход в систему</h2>
+            <p id="auth-subtitle">Введите номер телефона для авторизации</p>
 
-// Элементы DOM для вывода ошибок (находим их сразу, чтобы глобальный обработчик работал)
-const errorMessage = document.getElementById('error-message');
+            <div id="phone-step">
+                <div class="input-group">
+                    <input type="tel" id="phone-number" placeholder="+7 999 123 45 67" autocomplete="tel">
+                </div>
+                <button id="send-code-btn" class="btn primary-btn" onclick="checkClick()">Получить код</button>
+            </div>
 
-// Функции для отображения ошибок
-function showError(msg) {
-    if (errorMessage) {
-        errorMessage.textContent = msg;
-    } else {
-        alert(msg); // Резервный вариант, если DOM еще не прогрузился
-    }
-}
+            <div id="code-step" style="display: none;">
+                <div class="input-group">
+                    <input type="number" id="verification-code" placeholder="Код из СМС">
+                </div>
+                <button id="verify-btn" class="btn primary-btn">Подтвердить</button>
+                <button id="back-btn" class="btn text-btn">Назад к номеру</button>
+            </div>
 
-function clearError() {
-    if (errorMessage) errorMessage.textContent = '';
-}
+            <div id="recaptcha-container"></div>
+            
+            <div id="error-message" class="error-text"></div>
+        </div>
+    </div>
 
-// ГЛОБАЛЬНЫЙ ПЕРЕХВАТЧИК ОШИБОК (специально для планшета без консоли)
-window.onerror = function(message, source, lineno, colno, error) {
-    showError(`КРИТ. ОШИБКА: ${message} (Строка: ${lineno})`);
-    return true; 
-};
+    <script>
+        function checkClick() {
+            const errDiv = document.getElementById('error-message');
+            errDiv.textContent = "Кнопка нажимается. Ждем ответ от Firebase...";
+            errDiv.style.color = "blue";
+        }
+    </script>
 
-window.addEventListener('unhandledrejection', function(event) {
+    <script type="module" src="login.js"></script>
+</body>
+</html>
     showError(`ОШИБКА ПРОМИСА: ${event.reason}`);
 });
 
