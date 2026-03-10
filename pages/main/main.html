@@ -12,7 +12,7 @@
         
         <aside class="sidebar" id="sidebar">
             <header class="sidebar-header">
-                <button class="icon-btn" id="menu-btn" title="Меню">
+                <button class="icon-btn" id="burger-menu-btn">
                     <span class="material-icons">menu</span>
                 </button>
                 <div class="search-container">
@@ -22,65 +22,54 @@
             </header>
 
             <div class="chat-list" id="chat-list">
-                <div class="info-message">Загрузка контактов...</div>
-                </div>
+                <div class="info-message">Загрузка...</div>
+            </div>
             
-            <button class="floating-btn" id="new-chat-btn" title="Написать">
+            <button class="floating-btn" id="new-chat-btn">
                 <span class="material-icons">edit</span>
             </button>
             
             <div class="current-user-profile">
-                <div class="avatar-placeholder" id="my-avatar-placeholder">
+                <div class="avatar-placeholder">
                     <span class="material-icons">person</span>
                 </div>
                 <div class="my-info">
-                    <h4 id="my-display-name">Загрузка...</h4>
+                    <h4 id="my-display-name">...</h4>
                     <span id="my-phone-number">...</span>
                 </div>
-                <button class="icon-btn logout-btn" id="logout-btn" title="Выйти">
+                <button class="icon-btn" id="logout-btn">
                     <span class="material-icons">logout</span>
                 </button>
             </div>
         </aside>
 
         <main class="chat-area" id="chat-area">
-            
             <div class="no-chat-selected" id="no-chat-selected">
-                <div class="no-chat-content">
-                    <span class="material-icons" style="font-size: 64px; color: var(--text-secondary);">chat</span>
-                    <p>Выберите кому хотели бы написать</p>
-                </div>
+                <p>Выберите, кому написать</p>
             </div>
 
             <div class="active-chat" id="active-chat" style="display: none;">
-                
                 <header class="chat-header">
-                    <button class="icon-btn back-btn" id="back-to-sidebar-btn" title="Назад к списку">
+                    <button class="icon-btn back-btn" id="back-to-sidebar-btn">
                         <span class="material-icons">arrow_back</span>
                     </button>
                     <div class="chat-info">
-                        <div class="avatar-placeholder chat-avatar" id="current-chat-avatar">
-                            <span class="material-icons">person</span>
-                        </div>
                         <div class="chat-details">
-                            <h3 id="current-chat-name">Имя собеседника</h3>
-                            <span class="chat-status" id="current-chat-status">Был(а) недавно</span>
+                            <h3 id="current-chat-name">Имя</h3>
+                            <span class="chat-status">в сети</span>
                         </div>
                     </div>
                 </header>
 
-                <div class="messages-container" id="messages-container">
-                    </div>
+                <div class="messages-container" id="messages-container"></div>
 
                 <footer class="chat-input-area">
-                    <button class="icon-btn attach-btn" id="attach-btn" title="Прикрепить картинку">
+                    <button class="icon-btn" id="attach-btn">
                         <span class="material-icons">attach_file</span>
                     </button>
                     <input type="file" id="image-input" accept="image/*" style="display: none;">
-                    
-                    <textarea id="message-input" placeholder="Написать сообщение..." rows="1"></textarea>
-                    
-                    <button class="icon-btn send-btn" id="send-btn" title="Отправить">
+                    <textarea id="message-input" placeholder="Сообщение..." rows="1"></textarea>
+                    <button class="icon-btn" id="send-btn" style="color: var(--primary-color);">
                         <span class="material-icons">send</span>
                     </button>
                 </footer>
@@ -89,29 +78,21 @@
         
         <div class="modal-overlay" id="image-preview-modal" style="display: none;">
             <div class="modal-content">
-                <button class="icon-btn close-modal-btn" id="close-preview-btn">
-                    <span class="material-icons">close</span>
-                </button>
-                <img id="preview-image" src="" alt="Предпросмотр">
-                <button class="btn primary-btn" id="send-image-btn">Отправить картинку</button>
+                <img id="preview-image" src="">
+                <button class="btn primary-btn" id="send-image-btn">Отправить</button>
+                <button class="btn" id="close-preview-btn">Отмена</button>
             </div>
         </div>
 
         <div class="modal-overlay" id="new-chat-modal" style="display: none;">
-            <div class="modal-content new-chat-content">
-                <button class="icon-btn close-modal-btn" id="close-new-chat-btn">
-                    <span class="material-icons">close</span>
-                </button>
-                <h3 style="margin-bottom: 10px;">Новый чат</h3>
-                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;">Введите номер телефона пользователя (например, +79991234567)</p>
-                <div class="input-group" style="margin-bottom: 20px; width: 100%;">
-                    <input type="tel" id="new-chat-phone" placeholder="+7 999 123 45 67" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; outline: none; background: #fff; color: #000;">
-                </div>
-                <button class="btn primary-btn" id="start-new-chat-btn" style="width: 100%; padding: 12px; border: none; border-radius: 8px; background-color: var(--primary-color); color: white; font-size: 16px; cursor: pointer;">Начать общение</button>
-                <div id="new-chat-error" class="error-text" style="color: var(--error-color); margin-top: 15px; font-size: 14px; text-align: center;"></div>
+            <div class="modal-content">
+                <h3>Новый чат</h3>
+                <input type="tel" id="new-chat-phone" placeholder="+7...">
+                <button class="btn primary-btn" id="start-new-chat-btn">Начать</button>
+                <button class="btn" id="close-new-chat-btn">Закрыть</button>
+                <div id="new-chat-error" class="error-text"></div>
             </div>
         </div>
-
     </div>
 
     <script type="module" src="main.js"></script>
