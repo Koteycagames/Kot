@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>KotoGram - Звонок</title>
+    <link rel="stylesheet" href="call.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="call-container">
+        <video id="remoteVideo" autoplay playsinline></video>
+        
+        <div class="local-video-container">
+            <video id="localVideo" autoplay playsinline muted></video>
+        </div>
+
+        <div class="call-overlay" id="call-status">
+            <h2>Подготовка связи...</h2>
+            <p id="call-subtitle">Пожалуйста, разрешите доступ к камере</p>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn" id="toggle-audio-btn">
+                <span class="material-icons">mic</span>
+            </button>
+            <button class="control-btn" id="toggle-video-btn">
+                <span class="material-icons">videocam</span>
+            </button>
+            <button class="control-btn hangup" id="hangup-btn">
+                <span class="material-icons">call_end</span>
+            </button>
+        </div>
+    </div>
+
+    <script type="module" src="call.js"></script>
+</body>
+</html>
