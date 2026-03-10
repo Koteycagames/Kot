@@ -34,7 +34,6 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('logout-btn').onclick = () => signOut(auth);
 
-// МОДАЛКА
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -42,56 +41,52 @@ document.getElementById('new-chat-btn').onclick = () => {
 };
 document.getElementById('close-new-chat-btn').onclick = () => newChatModal.style.display = 'none';
 
-// УМНЫЙ ПОИСК С АЛЕРТАМИ ОШИБОК
+// --- СУПЕР ПОИСК С ДИАГНОСТИКОЙ ---
 document.getElementById('start-new-chat-btn').onclick = async () => {
     let rawPhone = document.getElementById('new-chat-phone').value.trim();
-    if (!rawPhone) {
-        alert("Введите номер телефона!");
-        return;
-    }
+    if (!rawPhone) return alert("Введите номер!");
 
-    // Чистим номер для сравнения (только цифры)
     let searchDigits = rawPhone.replace(/\D/g, ''); 
     const errorEl = document.getElementById('new-chat-error');
-    errorEl.textContent = "Ищем " + searchDigits + "...";
+    errorEl.textContent = "Диагностика базы...";
 
-    const usersRef = ref(db, 'users');
-    
     try {
-        // Пытаемся получить всех пользователей для ручного перебора (самый надежный способ, если Rules тупят)
-        const snapshot = await get(usersRef);
+        const snapshot = await get(ref(db, 'users'));
         
         if (!snapshot.exists()) {
-            alert("Ошибка: База пользователей пуста. Никто еще не зарегистрирован.");
-            return;
+            return alert("БАЗА ПУСТА! В ветке 'users' нет записей. Проверь Login.js");
         }
 
+        let allNumbersInDb = [];
         let foundUser = null;
+
         snapshot.forEach(child => {
             const userData = child.val();
-            const dbPhoneDigits = userData.phoneNumber ? userData.phoneNumber.replace(/\D/g, '') : '';
+            const dbPhone = userData.phoneNumber || "НЕТ НОМЕРА";
+            const dbDigits = dbPhone.replace(/\D/g, '');
             
-            if (dbPhoneDigits === searchDigits) {
+            allNumbersInDb.push(dbPhone); // Собираем для отчета
+
+            if (dbDigits === searchDigits && searchDigits !== "") {
                 foundUser = userData;
             }
         });
 
-        if (foundUser) {
+        // ВЫВОДИМ ОТЧЕТ, ЕСЛИ НЕ НАШЛИ
+        if (!foundUser) {
+            alert("НЕ НАЙДЕНО!\nТвой ввод: " + rawPhone + "\nВ базе сейчас есть номера:\n" + allNumbersInDb.join("\n"));
+            errorEl.textContent = "Не найден";
+        } else {
             if (foundUser.uid === currentUser.uid) {
-                alert("Это ваш собственный номер телефона!");
-                errorEl.textContent = "";
+                alert("Это вы сами (" + foundUser.phoneNumber + ")");
             } else {
                 newChatModal.style.display = 'none';
                 openChat(foundUser);
             }
-        } else {
-            alert("Пользователь с номером " + rawPhone + " не найден в KotoGram. Проверьте правильность или пригласите друга.");
-            errorEl.textContent = "Не найден";
         }
 
-    } catch (error) {
-        console.error("Firebase Error:", error);
-        alert("Критическая ошибка базы: " + error.message + "\nПроверьте Rules в консоли Firebase!");
+    } catch (e) {
+        alert("ОШИБКА FIREBASE: " + e.message);
     }
 };
 
@@ -114,25 +109,21 @@ function loadMessages() {
                    `${currentUser.uid}_${currentChatUser.uid}` : 
                    `${currentChatUser.uid}_${currentUser.uid}`;
     
-    const msgRef = ref(db, `chats/${chatId}/messages`);
-    unsubscribeMessages = onValue(msgRef, (snapshot) => {
+    unsubscribeMessages = onValue(ref(db, `chats/${chatId}/messages`), (snap) => {
         const container = document.getElementById('messages-container');
         container.innerHTML = '';
-        snapshot.forEach(child => {
-            const msg = child.val();
-            const div = document.createElement('div');
-            const isMine = msg.senderId === currentUser.uid;
-            div.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
-            div.style.background = isMine ? '#effdde' : '#fff';
-            div.style.padding = '10px';
-            div.style.borderRadius = '12px';
-            div.style.maxWidth = '85%';
-            div.style.margin = '4px 0';
-            div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
+        snap.forEach(c => {
+            const m = c.val();
+            const d = document.createElement('div');
+            const isMine = m.senderId === currentUser.uid;
+            d.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
+            d.style.background = isMine ? '#effdde' : '#fff';
+            d.style.padding = '10px'; d.style.borderRadius = '12px'; d.style.margin = '4px 0';
+            d.style.maxWidth = '85%'; d.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
 
-            if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
-            if (msg.text) div.innerHTML += `<span style="word-break: break-word;">${msg.text}</span>`;
-            container.appendChild(div);
+            if (m.imageUrl) d.innerHTML += `<img src="${m.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
+            if (m.text) d.innerHTML += `<span style="word-break: break-word;">${m.text}</span>`;
+            container.appendChild(d);
         });
         container.scrollTop = container.scrollHeight;
     });
@@ -147,7 +138,6 @@ function sendMessage(text = '', img = null) {
     const chatId = currentUser.uid < currentChatUser.uid ? 
                    `${currentUser.uid}_${currentChatUser.uid}` : 
                    `${currentChatUser.uid}_${currentUser.uid}`;
-                   
     push(ref(db, `chats/${chatId}/messages`), {
         senderId: currentUser.uid,
         text: text,
@@ -158,52 +148,52 @@ function sendMessage(text = '', img = null) {
 }
 
 function loadMyChats() {
-    const list = document.getElementById('chat-list');
-    onValue(ref(db, 'users'), (snapshot) => {
+    onValue(ref(db, 'users'), (snap) => {
+        const list = document.getElementById('chat-list');
         list.innerHTML = '';
         let count = 0;
-        snapshot.forEach(child => {
-            const user = child.val();
-            if (user.uid !== currentUser.uid && user.displayName !== "New Koto User") {
+        snap.forEach(c => {
+            const u = c.val();
+            if (u.uid !== currentUser.uid && u.displayName !== "New Koto User") {
                 const item = document.createElement('div');
                 item.className = 'chat-item';
-                item.innerHTML = `<strong>${user.displayName || 'Контакт'}</strong><br><small>${user.phoneNumber}</small>`;
-                item.onclick = () => openChat(user);
+                item.innerHTML = `<strong>${u.displayName || 'Контакт'}</strong><br><small>${u.phoneNumber}</small>`;
+                item.onclick = () => openChat(u);
                 list.appendChild(item);
                 count++;
             }
         });
-        if (count === 0) list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Нет активных чатов</div>';
+        if (count === 0) list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Нет чатов</div>';
     });
 }
 
-// ИЗОБРАЖЕНИЯ
+// КАРТИНКИ
 document.getElementById('attach-btn').onclick = () => document.getElementById('image-input').click();
 document.getElementById('image-input').onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
+    const f = e.target.files[0];
+    if (f) {
+        const r = new FileReader();
+        r.onload = (ev) => {
             document.getElementById('preview-image').src = ev.target.result;
             document.getElementById('image-preview-modal').style.display = 'flex';
         };
-        reader.readAsDataURL(file);
+        r.readAsDataURL(f);
     }
 };
+document.getElementById('close-preview-btn').onclick = () => document.getElementById('image-preview-modal').style.display = 'none';
 
 document.getElementById('send-image-btn').onclick = async () => {
-    const file = document.getElementById('image-input').files[0];
-    const btn = document.getElementById('send-image-btn');
-    btn.disabled = true; btn.textContent = '...';
-    const formData = new FormData();
-    formData.append('image', file);
+    const f = document.getElementById('image-input').files[0];
+    const b = document.getElementById('send-image-btn');
+    b.disabled = true; b.textContent = '...';
+    const fd = new FormData(); fd.append('image', f);
     try {
-        const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.success) {
-            sendMessage('', data.data.url);
+        const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: fd });
+        const d = await res.json();
+        if (d.success) {
+            sendMessage('', d.data.url);
             document.getElementById('image-preview-modal').style.display = 'none';
         }
     } catch (e) { alert("Ошибка ImgBB"); }
-    btn.disabled = false; btn.textContent = 'Отправить';
+    b.disabled = false; b.textContent = 'Отправить';
 };
