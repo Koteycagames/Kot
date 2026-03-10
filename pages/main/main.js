@@ -34,6 +34,7 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('logout-btn').onclick = () => signOut(auth);
 
+// МОДАЛКА
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -41,61 +42,58 @@ document.getElementById('new-chat-btn').onclick = () => {
 };
 document.getElementById('close-new-chat-btn').onclick = () => newChatModal.style.display = 'none';
 
-// УМНЫЙ ПОИСК
+// УМНЫЙ ПОИСК С АЛЕРТАМИ ОШИБОК
 document.getElementById('start-new-chat-btn').onclick = async () => {
     let rawPhone = document.getElementById('new-chat-phone').value.trim();
-    if (!rawPhone) return;
+    if (!rawPhone) {
+        alert("Введите номер телефона!");
+        return;
+    }
 
-    // Очищаем для стандартного поиска (оставляем +)
-    let searchPhone = rawPhone.replace(/[^\d+]/g, '');
-    if (!searchPhone.startsWith('+') && searchPhone.startsWith('7')) searchPhone = '+' + searchPhone;
-
+    // Чистим номер для сравнения (только цифры)
+    let searchDigits = rawPhone.replace(/\D/g, ''); 
     const errorEl = document.getElementById('new-chat-error');
-    errorEl.textContent = "Синхронизация...";
+    errorEl.textContent = "Ищем " + searchDigits + "...";
 
     const usersRef = ref(db, 'users');
     
     try {
-        // Сначала пробуем точный поиск (быстрый)
-        const q = query(usersRef, orderByChild('phoneNumber'), equalTo(searchPhone));
-        const snap = await get(q);
-
-        if (snap.exists()) {
-            const userData = Object.values(snap.val())[0];
-            handleFoundUser(userData);
-        } else {
-            // Если не нашло, делаем "мягкий" поиск по цифрам (запасной вариант)
-            errorEl.textContent = "Глубокий поиск...";
-            const allUsersSnap = await get(usersRef);
-            let found = false;
-
-            const digitsOnlySearch = searchPhone.replace(/\D/g, '');
-
-            allUsersSnap.forEach(child => {
-                const u = child.val();
-                const uDigits = u.phoneNumber ? u.phoneNumber.replace(/\D/g, '') : '';
-                if (uDigits && uDigits === digitsOnlySearch) {
-                    handleFoundUser(u);
-                    found = true;
-                    return true; 
-                }
-            });
-
-            if (!found) errorEl.textContent = "Пользователь не найден. Проверьте номер.";
+        // Пытаемся получить всех пользователей для ручного перебора (самый надежный способ, если Rules тупят)
+        const snapshot = await get(usersRef);
+        
+        if (!snapshot.exists()) {
+            alert("Ошибка: База пользователей пуста. Никто еще не зарегистрирован.");
+            return;
         }
-    } catch (e) {
-        errorEl.textContent = "Ошибка базы данных";
+
+        let foundUser = null;
+        snapshot.forEach(child => {
+            const userData = child.val();
+            const dbPhoneDigits = userData.phoneNumber ? userData.phoneNumber.replace(/\D/g, '') : '';
+            
+            if (dbPhoneDigits === searchDigits) {
+                foundUser = userData;
+            }
+        });
+
+        if (foundUser) {
+            if (foundUser.uid === currentUser.uid) {
+                alert("Это ваш собственный номер телефона!");
+                errorEl.textContent = "";
+            } else {
+                newChatModal.style.display = 'none';
+                openChat(foundUser);
+            }
+        } else {
+            alert("Пользователь с номером " + rawPhone + " не найден в KotoGram. Проверьте правильность или пригласите друга.");
+            errorEl.textContent = "Не найден";
+        }
+
+    } catch (error) {
+        console.error("Firebase Error:", error);
+        alert("Критическая ошибка базы: " + error.message + "\nПроверьте Rules в консоли Firebase!");
     }
 };
-
-function handleFoundUser(userData) {
-    if (userData.uid === currentUser.uid) {
-        document.getElementById('new-chat-error').textContent = "Это вы";
-    } else {
-        newChatModal.style.display = 'none';
-        openChat(userData);
-    }
-}
 
 function openChat(user) {
     currentChatUser = user;
@@ -121,27 +119,23 @@ function loadMessages() {
         const container = document.getElementById('messages-container');
         container.innerHTML = '';
         snapshot.forEach(child => {
-            renderMessage(child.val(), container);
+            const msg = child.val();
+            const div = document.createElement('div');
+            const isMine = msg.senderId === currentUser.uid;
+            div.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
+            div.style.background = isMine ? '#effdde' : '#fff';
+            div.style.padding = '10px';
+            div.style.borderRadius = '12px';
+            div.style.maxWidth = '85%';
+            div.style.margin = '4px 0';
+            div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
+
+            if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
+            if (msg.text) div.innerHTML += `<span style="word-break: break-word;">${msg.text}</span>`;
+            container.appendChild(div);
         });
         container.scrollTop = container.scrollHeight;
     });
-}
-
-function renderMessage(msg, container) {
-    const div = document.createElement('div');
-    const isMine = msg.senderId === currentUser.uid;
-    div.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
-    div.style.background = isMine ? '#effdde' : '#fff';
-    div.style.padding = '10px';
-    div.style.borderRadius = '12px';
-    div.style.maxWidth = '85%';
-    div.style.margin = '4px 0';
-    div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
-
-    if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
-    if (msg.text) div.innerHTML += `<span style="word-break: break-word; font-size: 15px;">${msg.text}</span>`;
-    
-    container.appendChild(div);
 }
 
 document.getElementById('send-btn').onclick = () => {
@@ -167,24 +161,23 @@ function loadMyChats() {
     const list = document.getElementById('chat-list');
     onValue(ref(db, 'users'), (snapshot) => {
         list.innerHTML = '';
-        let found = false;
+        let count = 0;
         snapshot.forEach(child => {
             const user = child.val();
-            // Убираем себя и тестового юзера
             if (user.uid !== currentUser.uid && user.displayName !== "New Koto User") {
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 item.innerHTML = `<strong>${user.displayName || 'Контакт'}</strong><br><small>${user.phoneNumber}</small>`;
                 item.onclick = () => openChat(user);
                 list.appendChild(item);
-                found = true;
+                count++;
             }
         });
-        if (!found) list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Нет чатов</div>';
+        if (count === 0) list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Нет активных чатов</div>';
     });
 }
 
-// КАРТИНКИ
+// ИЗОБРАЖЕНИЯ
 document.getElementById('attach-btn').onclick = () => document.getElementById('image-input').click();
 document.getElementById('image-input').onchange = (e) => {
     const file = e.target.files[0];
