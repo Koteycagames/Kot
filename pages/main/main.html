@@ -2,13 +2,13 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>KotoGram</title>
     <link rel="stylesheet" href="main.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
+    <div class="app-container" id="app-viewport">
         
         <aside class="sidebar" id="sidebar">
             <header class="sidebar-header">
@@ -17,7 +17,7 @@
                 </button>
                 <div class="search-container">
                     <span class="material-icons search-icon">search</span>
-                    <input type="text" id="search-input" placeholder="Поиск чатов...">
+                    <input type="text" id="search-input" placeholder="Поиск...">
                 </div>
             </header>
 
@@ -30,9 +30,6 @@
             </button>
             
             <div class="current-user-profile">
-                <div class="avatar-placeholder">
-                    <span class="material-icons">person</span>
-                </div>
                 <div class="my-info">
                     <h4 id="my-display-name">...</h4>
                     <span id="my-phone-number">...</span>
@@ -45,7 +42,7 @@
 
         <main class="chat-area" id="chat-area">
             <div class="no-chat-selected" id="no-chat-selected">
-                <p>Выберите, кому написать</p>
+                <p>Выберите чат</p>
             </div>
 
             <div class="active-chat" id="active-chat" style="display: none;">
@@ -54,10 +51,7 @@
                         <span class="material-icons">arrow_back</span>
                     </button>
                     <div class="chat-info">
-                        <div class="chat-details">
-                            <h3 id="current-chat-name">Имя</h3>
-                            <span class="chat-status">в сети</span>
-                        </div>
+                        <h3 id="current-chat-name">Чат</h3>
                     </div>
                 </header>
 
@@ -69,28 +63,28 @@
                     </button>
                     <input type="file" id="image-input" accept="image/*" style="display: none;">
                     <textarea id="message-input" placeholder="Сообщение..." rows="1"></textarea>
-                    <button class="icon-btn" id="send-btn" style="color: var(--primary-color);">
+                    <button class="icon-btn" id="send-btn">
                         <span class="material-icons">send</span>
                     </button>
                 </footer>
             </div>
         </main>
         
-        <div class="modal-overlay" id="image-preview-modal" style="display: none;">
-            <div class="modal-content">
-                <img id="preview-image" src="">
-                <button class="btn primary-btn" id="send-image-btn">Отправить</button>
-                <button class="btn" id="close-preview-btn">Отмена</button>
-            </div>
-        </div>
-
         <div class="modal-overlay" id="new-chat-modal" style="display: none;">
             <div class="modal-content">
-                <h3>Новый чат</h3>
-                <input type="tel" id="new-chat-phone" placeholder="+7...">
-                <button class="btn primary-btn" id="start-new-chat-btn">Начать</button>
-                <button class="btn" id="close-new-chat-btn">Закрыть</button>
+                <h3>Написать по номеру</h3>
+                <input type="tel" id="new-chat-phone" placeholder="+79991234567">
+                <button class="btn primary-btn" id="start-new-chat-btn">Найти и написать</button>
+                <button class="btn" id="close-new-chat-btn">Отмена</button>
                 <div id="new-chat-error" class="error-text"></div>
+            </div>
+        </div>
+        
+        <div class="modal-overlay" id="image-preview-modal" style="display: none;">
+            <div class="modal-content">
+                <img id="preview-image" src="" style="max-height: 50vh; object-fit: contain;">
+                <button class="btn primary-btn" id="send-image-btn">Отправить фото</button>
+                <button class="btn" id="close-preview-btn">Закрыть</button>
             </div>
         </div>
     </div>
