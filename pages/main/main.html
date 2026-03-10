@@ -4,82 +4,97 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>KotoGram</title>
-    <link rel="stylesheet" href="main.css?v=2">
+    <link rel="stylesheet" href="main.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <div class="telegram-layout">
+    <div class="app-container">
         
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <header class="sidebar-header">
-                <button id="menu-btn" class="icon-btn">☰</button>
-                <div class="search-bar">
-                    <input type="text" placeholder="Поиск...">
+                <button class="icon-btn" id="menu-btn" title="Меню">
+                    <span class="material-icons">menu</span>
+                </button>
+                <div class="search-container">
+                    <span class="material-icons search-icon">search</span>
+                    <input type="text" id="search-input" placeholder="Поиск пользователей...">
                 </div>
             </header>
-            
-            <div class="chat-list" id="chat-list">
-                <div class="empty-text" id="empty-chat-list">Нет чатов. Нажмите на карандаш.</div>
-            </div>
 
-            <button id="new-chat-fab" class="fab">✎</button>
+            <div class="chat-list" id="chat-list">
+                <div class="info-message">Загрузка контактов...</div>
+                </div>
+            
+            <div class="current-user-profile">
+                <div class="avatar-placeholder" id="my-avatar-placeholder">
+                    <span class="material-icons">person</span>
+                </div>
+                <div class="my-info">
+                    <h4 id="my-display-name">Загрузка...</h4>
+                    <span id="my-phone-number">...</span>
+                </div>
+                <button class="icon-btn logout-btn" id="logout-btn" title="Выйти">
+                    <span class="material-icons">logout</span>
+                </button>
+            </div>
         </aside>
 
-        <main class="chat-area">
-            <div id="no-chat-selected" class="no-chat-selected">
-                <span>Выберите чат, чтобы начать общение</span>
+        <main class="chat-area" id="chat-area">
+            
+            <div class="no-chat-selected" id="no-chat-selected">
+                <div class="no-chat-content">
+                    <span class="material-icons" style="font-size: 64px; color: var(--text-secondary);">chat</span>
+                    <p>Выберите чат, чтобы начать общение</p>
+                </div>
             </div>
 
-            <div id="active-chat-container" class="active-chat-container" style="display: none;">
+            <div class="active-chat" id="active-chat" style="display: none;">
+                
                 <header class="chat-header">
+                    <button class="icon-btn back-btn" id="back-to-sidebar-btn" title="Назад к списку">
+                        <span class="material-icons">arrow_back</span>
+                    </button>
                     <div class="chat-info">
-                        <div class="chat-avatar" id="current-chat-avatar">К</div>
-                        <div class="chat-title-container">
-                            <h2 id="current-chat-name">Имя контакта</h2>
-                            <span id="current-chat-phone">номер телефона</span>
+                        <div class="avatar-placeholder chat-avatar" id="current-chat-avatar">
+                            <span class="material-icons">person</span>
+                        </div>
+                        <div class="chat-details">
+                            <h3 id="current-chat-name">Имя собеседника</h3>
+                            <span class="chat-status" id="current-chat-status">Был(а) недавно</span>
                         </div>
                     </div>
-                    <button class="icon-btn">⋮</button>
                 </header>
 
-                <div class="chat-messages" id="chat-messages"></div>
+                <div class="messages-container" id="messages-container">
+                    </div>
 
                 <footer class="chat-input-area">
+                    <button class="icon-btn attach-btn" id="attach-btn" title="Прикрепить картинку">
+                        <span class="material-icons">attach_file</span>
+                    </button>
                     <input type="file" id="image-input" accept="image/*" style="display: none;">
-                    <button id="attach-btn" class="icon-btn">📎</button>
-                    <input type="text" id="message-input" placeholder="Написать сообщение..." autocomplete="off">
-                    <button id="send-btn" class="icon-btn send-btn">➤</button>
+                    
+                    <textarea id="message-input" placeholder="Напишите сообщение..." rows="1"></textarea>
+                    
+                    <button class="icon-btn send-btn" id="send-btn" title="Отправить">
+                        <span class="material-icons">send</span>
+                    </button>
                 </footer>
             </div>
         </main>
-
-        <div id="new-chat-modal" class="modal">
+        
+        <div class="image-preview-modal" id="image-preview-modal" style="display: none;">
             <div class="modal-content">
-                <h3>Новый чат</h3>
-                <p>Введите номер телефона с плюсом и кодом.</p>
-                <input type="tel" id="new-contact-phone" placeholder="+380... или +7...">
-                <div class="modal-buttons">
-                    <button id="cancel-new-chat" class="btn-cancel">Отмена</button>
-                    <button id="confirm-new-chat" class="btn-primary">Начать чат</button>
-                </div>
+                <button class="icon-btn close-modal-btn" id="close-preview-btn">
+                    <span class="material-icons">close</span>
+                </button>
+                <img id="preview-image" src="" alt="Предпросмотр">
+                <button class="btn primary-btn" id="send-image-btn">Отправить картинку</button>
             </div>
         </div>
-
-        <div id="side-menu" class="side-menu">
-            <div class="menu-header">
-                <div class="avatar-placeholder" id="user-avatar">К</div>
-                <div class="user-info">
-                    <h2 id="user-name">Загрузка...</h2>
-                    <p id="user-phone">...</p>
-                </div>
-            </div>
-            <ul class="menu-items">
-                <li id="nav-logout" class="danger">🚪 Выйти</li>
-            </ul>
-        </div>
-        <div id="menu-overlay" class="overlay"></div>
 
     </div>
 
-    <script type="module" src="main.js?v=2"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>
