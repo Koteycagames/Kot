@@ -1,39 +1,154 @@
+:root {
+    --primary-color: #3390ec;
+    --primary-hover: #2a7ac8;
+    --bg-color: #f4f4f5;
+    --box-bg: #ffffff;
+    --text-color: #000000;
+    --text-secondary: #707579;
+    --border-color: #dfe1e5;
+    --error-color: #e53935;
+}
+
 * {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-    background-color: #1e1e1e;
-    color: #ffffff;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
 }
 
-.auth-container {
-    background-color: #2c2c2c;
-    width: 90%;
+.login-container {
+    width: 100%;
     max-width: 400px;
+    padding: 20px;
+}
+
+.login-box {
+    background-color: var(--box-bg);
+    border-radius: 12px;
     padding: 40px 30px;
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     text-align: center;
 }
 
-h1 {
-    font-size: 24px;
+.logo h1 {
+    color: var(--primary-color);
+    font-size: 32px;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+h2 {
+    font-size: 22px;
+    color: var(--text-color);
     margin-bottom: 10px;
-    font-weight: 600;
 }
 
 p {
-    font-size: 14px;
-    color: #aaaaaa;
+    font-size: 15px;
+    color: var(--text-secondary);
     margin-bottom: 25px;
+}
+
+.input-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+input[type="tel"],
+input[type="number"] {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+    background-color: #fff;
+    color: var(--text-color);
+}
+
+input[type="tel"]:focus,
+input[type="number"]:focus {
+    border-color: var(--primary-color);
+}
+
+/* Убираем стрелочки у input type="number" */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s;
+    margin-bottom: 10px;
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.primary-btn:hover {
+    background-color: var(--primary-hover);
+}
+
+.text-btn {
+    background-color: transparent;
+    color: var(--primary-color);
+}
+
+.text-btn:hover {
+    background-color: rgba(51, 144, 236, 0.05);
+}
+
+.error-text {
+    color: var(--error-color);
+    font-size: 14px;
+    margin-top: 15px;
+    min-height: 20px;
+}
+
+#recaptcha-container {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+}
+
+/* Адаптация для мобильных устройств (убираем тени и скругления на весь экран) */
+@media (max-width: 480px) {
+    .login-box {
+        box-shadow: none;
+        padding: 20px;
+        background-color: transparent;
+    }
+    
+    body {
+        background-color: var(--box-bg);
+        align-items: flex-start;
+        padding-top: 10vh;
+    }
+}
     line-height: 1.5;
 }
 
