@@ -21,7 +21,6 @@ let currentUser = null;
 let currentChatUser = null;
 let unsubscribeMessages = null;
 
-// ПРОВЕРКА ВХОДА
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
@@ -35,7 +34,6 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('logout-btn').onclick = () => signOut(auth);
 
-// МОДАЛКА НОВОГО ЧАТА
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -44,20 +42,20 @@ document.getElementById('new-chat-btn').onclick = () => {
 };
 document.getElementById('close-new-chat-btn').onclick = () => newChatModal.style.display = 'none';
 
-// ПОИСК ПО НОМЕРУ
+// ФУНКЦИЯ ПОИСКА
 document.getElementById('start-new-chat-btn').onclick = async () => {
-    let phone = document.getElementById('new-chat-phone').value.trim();
-    if (!phone) return;
+    let rawPhone = document.getElementById('new-chat-phone').value.trim();
+    if (!rawPhone) return;
 
-    // Авто-добавление плюса, если пользователь забыл
-    if (!phone.startsWith('+')) phone = '+' + phone;
+    // Очистка номера от скобок, тире и пробелов, оставляем только + и цифры
+    let cleanedPhone = rawPhone.replace(/[^\d+]/g, '');
+    if (!cleanedPhone.startsWith('+')) cleanedPhone = '+' + cleanedPhone;
 
     const errorEl = document.getElementById('new-chat-error');
-    errorEl.textContent = "Ищем в базе...";
+    errorEl.textContent = "Поиск " + cleanedPhone + "...";
 
     const usersRef = ref(db, 'users');
-    // ВАЖНО: В консоли Firebase должен быть создан индекс для .indexOn: ["phoneNumber"]
-    const userQuery = query(usersRef, orderByChild('phoneNumber'), equalTo(phone));
+    const userQuery = query(usersRef, orderByChild('phoneNumber'), equalTo(cleanedPhone));
     
     try {
         const snapshot = await get(userQuery);
@@ -66,18 +64,18 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
             const userData = Object.values(usersData)[0];
             
             if (userData.uid === currentUser.uid) {
-                errorEl.textContent = "Это ваш номер";
+                errorEl.textContent = "Вы нашли себя :)";
                 return;
             }
 
             newChatModal.style.display = 'none';
             openChat(userData);
         } else {
-            errorEl.textContent = "Пользователь не найден. Убедитесь, что номер в формате +79991234567";
+            errorEl.textContent = "Пользователь не найден. Убедитесь, что он зарегистрирован.";
         }
     } catch (e) {
         console.error(e);
-        errorEl.textContent = "Ошибка доступа к базе";
+        errorEl.textContent = "Ошибка: проверьте Rules в Firebase";
     }
 };
 
@@ -145,20 +143,14 @@ function sendMessage(text = '', img = null) {
 
 document.getElementById('send-btn').onclick = () => sendMessage(document.getElementById('message-input').value);
 
-// ЗАГРУЗКА СПИСКА ЧАТОВ (Убираем автоматический вывод всех юзеров)
 function loadMyChats() {
     const list = document.getElementById('chat-list');
-    
-    // Здесь логика "Мои контакты" — показываем только тех, кому мы уже писали
-    // Для этого проверяем ветку chats, где есть наш UID
     onValue(ref(db, 'users'), (snapshot) => {
         list.innerHTML = '';
         let found = false;
         snapshot.forEach(child => {
             const user = child.val();
-            // 1. Не показываем себя
-            // 2. Временный фильтр: показываем только тех, кто НЕ "New Koto User" 
-            // ИЛИ просто оставь поиск, а список будет наполняться по мере общения
+            // Показываем всех, кроме себя и системных заглушек
             if (user.uid !== currentUser.uid && user.displayName !== "New Koto User") {
                 const item = document.createElement('div');
                 item.className = 'chat-item';
@@ -168,7 +160,7 @@ function loadMyChats() {
                 found = true;
             }
         });
-        if (!found) list.innerHTML = '<div class="info-message">Нажмите на карандаш, чтобы найти собеседника</div>';
+        if (!found) list.innerHTML = '<div class="info-message">Нажмите карандаш, чтобы начать чат</div>';
     });
 }
 
@@ -190,7 +182,7 @@ document.getElementById('close-preview-btn').onclick = () => document.getElement
 document.getElementById('send-image-btn').onclick = async () => {
     const file = document.getElementById('image-input').files[0];
     const btn = document.getElementById('send-image-btn');
-    btn.disabled = true; btn.textContent = 'Отправка...';
+    btn.disabled = true; btn.textContent = '...';
     const formData = new FormData();
     formData.append('image', file);
     try {
@@ -201,5 +193,6 @@ document.getElementById('send-image-btn').onclick = async () => {
             document.getElementById('image-preview-modal').style.display = 'none';
         }
     } catch (e) { alert("Ошибка ImgBB"); }
-    btn.disabled = false; btn.textContent = 'Отправить фото';
+    btn.disabled = false; btn.textContent = 'Отправить';
 };
+                
