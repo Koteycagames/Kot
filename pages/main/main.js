@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { getDatabase, ref, onValue, push, set, serverTimestamp, get } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, set, serverTimestamp, get, remove } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
@@ -27,7 +27,8 @@ onAuthStateChanged(auth, (user) => {
         currentUser = user;
         document.getElementById('my-display-name').textContent = user.displayName || "Мой профиль";
         document.getElementById('my-phone-number').textContent = user.phoneNumber;
-        loadMyActiveChats(); // Загружаем только АКТИВНЫЕ чаты
+        loadMyActiveChats();
+        listenForIncomingCalls(); // <-- ЗАПУСКАЕМ СЛУХАЧА ЗВОНКОВ!
     } else {
         window.location.href = "../login/login.html";
     }
@@ -35,7 +36,75 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('logout-btn').onclick = () => signOut(auth);
 
-// УПРАВЛЕНИЕ МОДАЛКОЙ ПОИСКА
+// --- СИСТЕМА ЗВОНКОВ ---
+
+// ИСХОДЯЩИЙ ЗВОНОК (Кнопка в шапке чата)
+document.getElementById('call-btn').onclick = async () => {
+    if (!currentChatUser) return;
+    
+    // Генерируем уникальный ID комнаты для звонка
+    const roomRef = push(ref(db, 'calls'));
+    const roomId = roomRef.key;
+
+    // Записываем информацию о звонке в базу
+    await set(roomRef, {
+        caller: currentUser.uid,
+        receiver: currentChatUser.uid,
+        status: 'calling',
+        timestamp: serverTimestamp()
+    });
+
+    // Переходим на страницу звонка в режиме "звонящего"
+    window.location.href = `../call/call.html?room=${roomId}&mode=caller`;
+};
+
+// ВХОДЯЩИЙ ЗВОНОК (Слушаем базу)
+function listenForIncomingCalls() {
+    const callsRef = ref(db, 'calls');
+    
+    onValue(callsRef, async (snapshot) => {
+        let incomingCallData = null;
+        let activeRoomId = null;
+
+        snapshot.forEach(child => {
+            const data = child.val();
+            // Ищем звонок, который адресован НАМ и который еще идет
+            if (data.receiver === currentUser.uid && data.status === 'calling') {
+                incomingCallData = data;
+                activeRoomId = child.key;
+            }
+        });
+
+        const modal = document.getElementById('incoming-call-modal');
+        
+        if (incomingCallData && activeRoomId) {
+            // Узнаем имя того, кто звонит
+            const callerSnap = await get(ref(db, 'users/' + incomingCallData.caller));
+            const callerName = callerSnap.exists() ? (callerSnap.val().displayName || callerSnap.val().phoneNumber) : "Неизвестный";
+            
+            document.getElementById('caller-name').textContent = callerName;
+            modal.style.display = 'flex';
+
+            // Если мы ПРИНИМАЕМ звонок
+            document.getElementById('accept-call-btn').onclick = () => {
+                window.location.href = `../call/call.html?room=${activeRoomId}&mode=receiver`;
+            };
+
+            // Если мы СБРАСЫВАЕМ звонок
+            document.getElementById('decline-call-btn').onclick = async () => {
+                await remove(ref(db, `calls/${activeRoomId}`));
+                modal.style.display = 'none';
+            };
+        } else {
+            // Если звонок сбросили с той стороны - прячем модалку
+            modal.style.display = 'none';
+        }
+    });
+}
+
+// --- КОНЕЦ СИСТЕМЫ ЗВОНКОВ ---
+
+// МОДАЛКА НОВОГО ЧАТА И ПОИСК
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -44,7 +113,6 @@ document.getElementById('new-chat-btn').onclick = () => {
 };
 document.getElementById('close-new-chat-btn').onclick = () => newChatModal.style.display = 'none';
 
-// ТОТАЛЬНЫЙ ПОИСК ПО БАЗЕ
 document.getElementById('start-new-chat-btn').onclick = async () => {
     let rawPhone = document.getElementById('new-chat-phone').value.trim();
     if (!rawPhone) return;
@@ -65,19 +133,16 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
         snapshot.forEach(child => {
             const userData = child.val();
             const dbDigits = userData.phoneNumber ? userData.phoneNumber.replace(/\D/g, '') : '';
-            
             if (dbDigits === searchDigits) {
                 foundUser = userData;
             }
         });
 
         if (foundUser) {
-            // ЖЕСТКАЯ БЛОКИРОВКА ОТ САМОГО СЕБЯ
             if (foundUser.uid === currentUser.uid) {
                 errorEl.textContent = "Нельзя создать чат с самим собой!";
                 return;
             }
-            
             newChatModal.style.display = 'none';
             openChat(foundUser);
         } else {
@@ -88,7 +153,7 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
     }
 };
 
-// ОТКРЫТИЕ ЧАТА
+// ОТКРЫТИЕ ЧАТА И КНОПКА НАЗАД
 function openChat(user) {
     currentChatUser = user;
     document.getElementById('no-chat-selected').style.display = 'none';
@@ -102,7 +167,7 @@ document.getElementById('back-to-sidebar-btn').onclick = () => {
     document.getElementById('app-viewport').classList.remove('chat-open');
 };
 
-// ЗАГРУЗКА СООБЩЕНИЙ
+// ЗАГРУЗКА И ОТПРАВКА СООБЩЕНИЙ
 function loadMessages() {
     if (unsubscribeMessages) unsubscribeMessages();
     const chatId = currentUser.uid < currentChatUser.uid ? 
@@ -129,7 +194,6 @@ function loadMessages() {
     });
 }
 
-// ОТПРАВКА СООБЩЕНИЯ (И СОЗДАНИЕ СВЯЗИ)
 document.getElementById('send-btn').onclick = () => {
     const text = document.getElementById('message-input').value.trim();
     if (text) sendMessage(text);
@@ -137,12 +201,10 @@ document.getElementById('send-btn').onclick = () => {
 
 function sendMessage(text = '', img = null) {
     if (!currentChatUser) return;
-
     const myUid = currentUser.uid;
     const otherUid = currentChatUser.uid;
     const chatId = myUid < otherUid ? `${myUid}_${otherUid}` : `${otherUid}_${myUid}`;
 
-    // 1. Отправляем само сообщение
     push(ref(db, `chats/${chatId}/messages`), {
         senderId: myUid,
         text: text,
@@ -150,17 +212,15 @@ function sendMessage(text = '', img = null) {
         timestamp: serverTimestamp()
     });
 
-    // 2. АКТИВИРУЕМ ЧАТ У ОБОИХ ПОЛЬЗОВАТЕЛЕЙ (Магия Telegram)
     set(ref(db, `userChats/${myUid}/${otherUid}`), true);
     set(ref(db, `userChats/${otherUid}/${myUid}`), true);
 
     document.getElementById('message-input').value = '';
 }
 
-// НОВАЯ СИСТЕМА: ЗАГРУЗКА ТОЛЬКО АКТИВНЫХ ЧАТОВ
+// ЗАГРУЗКА АКТИВНЫХ ЧАТОВ
 function loadMyActiveChats() {
     const myChatsRef = ref(db, 'userChats/' + currentUser.uid);
-    
     onValue(myChatsRef, async (snapshot) => {
         const list = document.getElementById('chat-list');
         list.innerHTML = '';
@@ -170,13 +230,8 @@ function loadMyActiveChats() {
             return;
         }
 
-        // Собираем всех, с кем у нас есть чат
         const chatPromises = [];
-        snapshot.forEach(child => {
-            const otherUid = child.key;
-            chatPromises.push(get(ref(db, 'users/' + otherUid)));
-        });
-
+        snapshot.forEach(child => chatPromises.push(get(ref(db, 'users/' + child.key))));
         const usersSnapshots = await Promise.all(chatPromises);
         
         usersSnapshots.forEach(userSnap => {
@@ -192,7 +247,7 @@ function loadMyActiveChats() {
     });
 }
 
-// ИЗОБРАЖЕНИЯ (Остаются без изменений)
+// ИЗОБРАЖЕНИЯ
 document.getElementById('attach-btn').onclick = () => document.getElementById('image-input').click();
 document.getElementById('image-input').onchange = (e) => {
     const f = e.target.files[0];
@@ -223,4 +278,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-                                
+        
