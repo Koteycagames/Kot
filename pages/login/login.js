@@ -12,6 +12,32 @@ import {
     set 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
+// Элементы DOM для вывода ошибок (находим их сразу, чтобы глобальный обработчик работал)
+const errorMessage = document.getElementById('error-message');
+
+// Функции для отображения ошибок
+function showError(msg) {
+    if (errorMessage) {
+        errorMessage.textContent = msg;
+    } else {
+        alert(msg); // Резервный вариант, если DOM еще не прогрузился
+    }
+}
+
+function clearError() {
+    if (errorMessage) errorMessage.textContent = '';
+}
+
+// ГЛОБАЛЬНЫЙ ПЕРЕХВАТЧИК ОШИБОК (специально для планшета без консоли)
+window.onerror = function(message, source, lineno, colno, error) {
+    showError(`КРИТ. ОШИБКА: ${message} (Строка: ${lineno})`);
+    return true; 
+};
+
+window.addEventListener('unhandledrejection', function(event) {
+    showError(`ОШИБКА ПРОМИСА: ${event.reason}`);
+});
+
 // Конфигурация Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
@@ -23,9 +49,6 @@ const firebaseConfig = {
     appId: "1:755607509917:web:29b1b85eea516bde702d74"
 };
 
-// Ключ ImgBB (пока просто объявляем здесь, основное использование будет в main.js)
-const IMGBB_API_KEY = "706ffb03d5653cdf91990abac2ce7a29";
-
 // Инициализация Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -34,6 +57,133 @@ const db = getDatabase(app);
 // Устанавливаем язык устройства по умолчанию для СМС
 auth.useDeviceLanguage();
 
+// Остальные элементы DOM
+const phoneStep = document.getElementById('phone-step');
+const codeStep = document.getElementById('code-step');
+const phoneNumberInput = document.getElementById('phone-number');
+const verificationCodeInput = document.getElementById('verification-code');
+const sendCodeBtn = document.getElementById('send-code-btn');
+const verifyBtn = document.getElementById('verify-btn');
+const backBtn = document.getElementById('back-btn');
+const authSubtitle = document.getElementById('auth-subtitle');
+
+let confirmationResult = null;
+
+// Проверка, авторизован ли уже пользователь
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        window.location.href = "../main/main.html"; // Исправлен путь на случай, если запускаем из папки
+    }
+});
+
+// Настройка reCAPTCHA (оборачиваем в try-catch на всякий случай)
+try {
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': (response) => {
+            // reCAPTCHA решена
+        }
+    });
+} catch (e) {
+    showError("Ошибка инициализации reCAPTCHA: " + e.message);
+}
+
+// Шаг 1: Отправка СМС-кода
+sendCodeBtn.addEventListener('click', () => {
+    clearError();
+    const phoneNumber = phoneNumberInput.value.trim();
+    
+    if (!phoneNumber) {
+        showError("Пожалуйста, введите номер телефона в формате +79991234567");
+        return;
+    }
+
+    sendCodeBtn.disabled = true;
+    sendCodeBtn.textContent = "Отправка...";
+
+    const appVerifier = window.recaptchaVerifier;
+
+    signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+        .then((result) => {
+            // СМС отправлено успешно
+            confirmationResult = result;
+            phoneStep.style.display = 'none';
+            codeStep.style.display = 'block';
+            authSubtitle.textContent = `Код отправлен на ${phoneNumber}`;
+        })
+        .catch((error) => {
+            // ТЕПЕРЬ ОШИБКА ВЫВЕДЕТСЯ НА ЭКРАН ПЛАНШЕТА
+            showError(`Ошибка Firebase: ${error.message} (Код: ${error.code})`);
+            sendCodeBtn.disabled = false;
+            sendCodeBtn.textContent = "Получить код";
+            
+            // Сбрасываем reCAPTCHA
+            if (window.recaptchaVerifier) {
+                window.recaptchaVerifier.render().then(function(widgetId) {
+                    grecaptcha.reset(widgetId);
+                }).catch(e => console.log(e));
+            }
+        });
+});
+
+// Шаг 2: Проверка кода из СМС
+verifyBtn.addEventListener('click', () => {
+    clearError();
+    const code = verificationCodeInput.value.trim();
+    
+    if (!code) {
+        showError("Пожалуйста, введите код из СМС");
+        return;
+    }
+
+    verifyBtn.disabled = true;
+    verifyBtn.textContent = "Проверка...";
+
+    confirmationResult.confirm(code)
+        .then((result) => {
+            const user = result.user;
+            
+            // Проверяем, есть ли такой пользователь в БД
+            const userRef = ref(db, 'users/' + user.uid);
+            get(userRef).then((snapshot) => {
+                if (!snapshot.exists()) {
+                    set(userRef, {
+                        uid: user.uid,
+                        phoneNumber: user.phoneNumber,
+                        displayName: "Пользователь_" + user.uid.substring(0, 5),
+                        avatarUrl: "",
+                        status: "online",
+                        lastSeen: Date.now()
+                    }).then(() => {
+                        window.location.href = "../main/main.html";
+                    }).catch((dbError) => {
+                        showError("Ошибка записи в БД: " + dbError.message);
+                    });
+                } else {
+                    window.location.href = "../main/main.html";
+                }
+            }).catch((dbGetError) => {
+                showError("Ошибка чтения БД: " + dbGetError.message);
+                window.location.href = "../main/main.html"; // Все равно пускаем
+            });
+        })
+        .catch((error) => {
+            showError(`Ошибка проверки кода: ${error.message}`);
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = "Подтвердить";
+        });
+});
+
+// Шаг 3: Возврат к вводу номера
+backBtn.addEventListener('click', () => {
+    clearError();
+    codeStep.style.display = 'none';
+    phoneStep.style.display = 'block';
+    authSubtitle.textContent = "Введите номер телефона для авторизации";
+    sendCodeBtn.disabled = false;
+    sendCodeBtn.textContent = "Получить код";
+    verificationCodeInput.value = '';
+});
 // Элементы DOM
 const phoneStep = document.getElementById('phone-step');
 const codeStep = document.getElementById('code-step');
