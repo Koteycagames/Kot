@@ -17,13 +17,17 @@
                 </button>
                 <div class="search-container">
                     <span class="material-icons search-icon">search</span>
-                    <input type="text" id="search-input" placeholder="Поиск пользователей...">
+                    <input type="text" id="search-input" placeholder="Поиск чатов...">
                 </div>
             </header>
 
             <div class="chat-list" id="chat-list">
                 <div class="info-message">Загрузка контактов...</div>
                 </div>
+            
+            <button class="floating-btn" id="new-chat-btn" title="Написать">
+                <span class="material-icons">edit</span>
+            </button>
             
             <div class="current-user-profile">
                 <div class="avatar-placeholder" id="my-avatar-placeholder">
@@ -44,7 +48,7 @@
             <div class="no-chat-selected" id="no-chat-selected">
                 <div class="no-chat-content">
                     <span class="material-icons" style="font-size: 64px; color: var(--text-secondary);">chat</span>
-                    <p>Выберите чат, чтобы начать общение</p>
+                    <p>Выберите кому хотели бы написать</p>
                 </div>
             </div>
 
@@ -74,7 +78,7 @@
                     </button>
                     <input type="file" id="image-input" accept="image/*" style="display: none;">
                     
-                    <textarea id="message-input" placeholder="Напишите сообщение..." rows="1"></textarea>
+                    <textarea id="message-input" placeholder="Написать сообщение..." rows="1"></textarea>
                     
                     <button class="icon-btn send-btn" id="send-btn" title="Отправить">
                         <span class="material-icons">send</span>
@@ -83,13 +87,28 @@
             </div>
         </main>
         
-        <div class="image-preview-modal" id="image-preview-modal" style="display: none;">
+        <div class="modal-overlay" id="image-preview-modal" style="display: none;">
             <div class="modal-content">
                 <button class="icon-btn close-modal-btn" id="close-preview-btn">
                     <span class="material-icons">close</span>
                 </button>
                 <img id="preview-image" src="" alt="Предпросмотр">
                 <button class="btn primary-btn" id="send-image-btn">Отправить картинку</button>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="new-chat-modal" style="display: none;">
+            <div class="modal-content new-chat-content">
+                <button class="icon-btn close-modal-btn" id="close-new-chat-btn">
+                    <span class="material-icons">close</span>
+                </button>
+                <h3 style="margin-bottom: 10px;">Новый чат</h3>
+                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;">Введите номер телефона пользователя (например, +79991234567)</p>
+                <div class="input-group" style="margin-bottom: 20px; width: 100%;">
+                    <input type="tel" id="new-chat-phone" placeholder="+7 999 123 45 67" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; outline: none; background: #fff; color: #000;">
+                </div>
+                <button class="btn primary-btn" id="start-new-chat-btn" style="width: 100%; padding: 12px; border: none; border-radius: 8px; background-color: var(--primary-color); color: white; font-size: 16px; cursor: pointer;">Начать общение</button>
+                <div id="new-chat-error" class="error-text" style="color: var(--error-color); margin-top: 15px; font-size: 14px; text-align: center;"></div>
             </div>
         </div>
 
