@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>KotoGram - Настройки</title>
-    <link rel="stylesheet" href="settings.css">
+    <link rel="stylesheet" href="settings.css?v=1000">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
@@ -14,7 +14,8 @@
                 <span class="material-icons">arrow_back</span>
             </button>
             <h2>Настройки</h2>
-            <div style="width: 40px;"></div> </header>
+            <div style="width: 40px;"></div> 
+        </header>
 
         <main class="settings-content">
             <div class="profile-section">
@@ -40,6 +41,11 @@
             <div class="divider"></div>
 
             <div class="danger-section">
+                <button class="debug-btn" id="fix-account-btn">
+                    <span class="material-icons">build</span>
+                    Починить аккаунт (Дебаг)
+                </button>
+
                 <button class="danger-btn" id="logout-btn">
                     <span class="material-icons">logout</span>
                     Выйти из аккаунта
@@ -50,9 +56,9 @@
 
     <div class="loading-overlay" id="loading-overlay" style="display: none;">
         <div class="spinner"></div>
-        <p>Сохранение...</p>
+        <p>Обработка...</p>
     </div>
 
-    <script type="module" src="settings.js"></script>
+    <script type="module" src="settings.js?v=1000"></script>
 </body>
 </html>
