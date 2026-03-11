@@ -29,16 +29,7 @@
                 <span class="material-icons">edit</span>
             </button>
             
-            <div class="current-user-profile">
-                <div class="my-info">
-                    <h4 id="my-display-name">...</h4>
-                    <span id="my-phone-number">...</span>
-                </div>
-                <button class="icon-btn" id="logout-btn">
-                    <span class="material-icons">logout</span>
-                </button>
-            </div>
-        </aside>
+            </aside>
 
         <main class="chat-area" id="chat-area">
             <div class="no-chat-selected" id="no-chat-selected">
@@ -107,6 +98,34 @@
                         <span class="material-icons" style="font-size: 28px;">call</span>
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <div class="drawer-overlay" id="drawer-overlay"></div>
+        <div class="drawer" id="drawer">
+            <div class="drawer-header">
+                <div class="avatar-placeholder" style="width: 60px; height: 60px; margin-bottom: 10px;">
+                    <span class="material-icons" style="font-size: 32px;">person</span>
+                </div>
+                <div class="drawer-user-info">
+                    <h3 id="drawer-display-name">Загрузка...</h3>
+                    <p id="drawer-phone-number">+00000000000</p>
+                </div>
+            </div>
+            <div class="drawer-menu">
+                <button class="drawer-item" id="btn-settings">
+                    <span class="material-icons">settings</span>
+                    Настройки
+                </button>
+                <button class="drawer-item" id="btn-saved" onclick="alert('В разработке :)')">
+                    <span class="material-icons">bookmark_border</span>
+                    Сохраненные
+                </button>
+                <div style="height: 1px; background: #eee; margin: 10px 0;"></div>
+                <button class="drawer-item drawer-item-danger" id="drawer-logout-btn">
+                    <span class="material-icons">logout</span>
+                    Выйти
+                </button>
             </div>
         </div>
     </div>
