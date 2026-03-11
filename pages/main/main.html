@@ -28,8 +28,7 @@
             <button class="floating-btn" id="new-chat-btn">
                 <span class="material-icons">edit</span>
             </button>
-            
-            </aside>
+        </aside>
 
         <main class="chat-area" id="chat-area">
             <div class="no-chat-selected" id="no-chat-selected">
@@ -41,8 +40,9 @@
                     <button class="icon-btn back-btn" id="back-to-sidebar-btn">
                         <span class="material-icons">arrow_back</span>
                     </button>
-                    <div class="chat-info" style="flex: 1;">
-                        <h3 id="current-chat-name">Чат</h3>
+                    <div class="chat-info" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                        <h3 id="current-chat-name" style="margin: 0; line-height: 1.2;">Чат</h3>
+                        <span id="current-chat-status" style="font-size: 13px; color: var(--text-secondary); min-height: 16px;"></span>
                     </div>
                     <button class="icon-btn" id="call-btn" style="color: var(--primary-color);">
                         <span class="material-icons">call</span>
@@ -51,7 +51,18 @@
 
                 <div class="messages-container" id="messages-container"></div>
 
-                <footer class="chat-input-area">
+                <div id="reply-preview-box" style="display: none; background: white; border-top: 1px solid #ddd; padding: 8px 15px; align-items: center;">
+                    <span class="material-icons" style="color: var(--primary-color); margin-right: 10px;">reply</span>
+                    <div style="flex: 1; border-left: 3px solid var(--primary-color); padding-left: 8px; overflow: hidden;">
+                        <div id="reply-preview-name" style="color: var(--primary-color); font-size: 13px; font-weight: bold;">Имя</div>
+                        <div id="reply-preview-text" style="color: var(--text-secondary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Текст</div>
+                    </div>
+                    <button class="icon-btn" id="cancel-reply-btn" style="margin-left: 10px;">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+
+                <footer class="chat-input-area" style="border-top: none;">
                     <button class="icon-btn" id="attach-btn">
                         <span class="material-icons">attach_file</span>
                     </button>
@@ -116,10 +127,6 @@
                 <button class="drawer-item" id="btn-settings">
                     <span class="material-icons">settings</span>
                     Настройки
-                </button>
-                <button class="drawer-item" id="btn-saved" onclick="alert('В разработке :)')">
-                    <span class="material-icons">bookmark_border</span>
-                    Сохраненные
                 </button>
                 <div style="height: 1px; background: #eee; margin: 10px 0;"></div>
                 <button class="drawer-item drawer-item-danger" id="drawer-logout-btn">
