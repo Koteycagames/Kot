@@ -18,21 +18,19 @@ const db = getDatabase(app);
 
 let currentUser = null;
 
-// DOM Элементы
 const backBtn = document.getElementById('back-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const saveBtn = document.getElementById('save-btn');
+const fixAccountBtn = document.getElementById('fix-account-btn'); // Новая кнопка
 const nameInput = document.getElementById('display-name');
 const phoneDisplay = document.getElementById('user-phone');
 const loadingOverlay = document.getElementById('loading-overlay');
 
-// Проверка входа и загрузка текущих данных
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         phoneDisplay.textContent = user.phoneNumber;
-
-        // Достаем имя из базы данных
+        
         const userRef = ref(db, 'users/' + user.uid);
         try {
             const snapshot = await get(userRef);
@@ -40,60 +38,71 @@ onAuthStateChanged(auth, async (user) => {
                 const userData = snapshot.val();
                 nameInput.value = userData.displayName || "";
             }
-        } catch (e) {
-            console.error("Ошибка загрузки профиля:", e);
-        }
+        } catch (e) { console.error(e); }
     } else {
         window.location.href = "../login/login.html";
     }
 });
 
-// Кнопка Назад
-backBtn.onclick = () => {
-    window.location.href = "../main/main.html";
-};
+backBtn.onclick = () => window.location.href = "../main/main.html";
+logoutBtn.onclick = () => signOut(auth);
 
-// Кнопка Выхода
-logoutBtn.onclick = () => {
-    signOut(auth);
-};
-
-// Сохранение нового имени
+// --- СОХРАНЕНИЕ ИМЕНИ ---
 saveBtn.onclick = async () => {
     const newName = nameInput.value.trim();
-    
-    if (!newName) {
-        alert("Имя не может быть пустым!");
-        return;
-    }
+    if (!newName) return alert("Имя не может быть пустым!");
 
-    loadingOverlay.style.display = 'flex'; // Показываем крутилку
-
+    loadingOverlay.style.display = 'flex';
     try {
-        // Обновляем имя во встроенном профиле Firebase Auth
         await updateProfile(currentUser, { displayName: newName });
-
-        // Обновляем имя в нашей базе Realtime Database (чтобы видели другие)
-        const userRef = ref(db, 'users/' + currentUser.uid);
-        await update(userRef, {
-            displayName: newName
-        });
-
-        loadingOverlay.style.display = 'none'; // Прячем крутилку
+        await update(ref(db, 'users/' + currentUser.uid), { displayName: newName });
         
-        // Маленькая визуальная обратная связь
+        loadingOverlay.style.display = 'none';
         const originalText = saveBtn.innerHTML;
         saveBtn.innerHTML = '<span class="material-icons">check</span> Сохранено!';
-        saveBtn.style.background = '#4caf50'; // Делаем зеленым
-        
+        saveBtn.style.background = '#4caf50';
         setTimeout(() => {
             saveBtn.innerHTML = originalText;
-            saveBtn.style.background = ''; // Возвращаем родной цвет
+            saveBtn.style.background = '';
         }, 2000);
-
     } catch (error) {
         loadingOverlay.style.display = 'none';
-        console.error("Ошибка сохранения:", error);
         alert("Ошибка: " + error.message);
+    }
+};
+
+// --- ФУНКЦИЯ "ПОЧИНИТЬ АККАУНТ" ---
+fixAccountBtn.onclick = async () => {
+    if (!currentUser) return;
+    
+    loadingOverlay.style.display = 'flex';
+    try {
+        const userRef = ref(db, 'users/' + currentUser.uid);
+        const snap = await get(userRef);
+        const data = snap.exists() ? snap.val() : {};
+        
+        let updates = {};
+        
+        // Проверяем, чего не хватает, и собираем это в объект updates
+        if (!data.uid) updates.uid = currentUser.uid;
+        if (!data.phoneNumber) updates.phoneNumber = currentUser.phoneNumber;
+        if (!data.displayName) updates.displayName = currentUser.displayName || "Без имени";
+        
+        // В будущем, если добавим аватарки, сюда можно дописать:
+        // if (!data.photoUrl) updates.photoUrl = "default_avatar_url";
+
+        // Если нашли что чинить - чиним
+        if (Object.keys(updates).length > 0) {
+            await update(userRef, updates);
+            loadingOverlay.style.display = 'none';
+            alert("✅ Аккаунт починен! Добавлены недостающие поля:\n" + Object.keys(updates).join(', '));
+        } else {
+            loadingOverlay.style.display = 'none';
+            alert("✨ С аккаунтом всё в полном порядке, чинить нечего!");
+        }
+        
+    } catch (error) {
+        loadingOverlay.style.display = 'none';
+        alert("Ошибка при починке: " + error.message);
     }
 };
