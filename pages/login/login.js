@@ -13,29 +13,28 @@ const firebaseConfig = {
     appId: "1:755607509917:web:29b1b85eea516bde702d74"
 };
 
-// Инициализация
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
 let confirmationResult = null;
 
-// --- ГЛАВНАЯ ПРОВЕРКА ПРИ ВХОДЕ (СИСТЕМА БАНОВ) ---
+// --- ПРОВЕРКА БАНА ПРИ ВХОДЕ ---
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         try {
             const userRef = ref(db, 'users/' + user.uid);
             const userSnap = await get(userRef);
             
-            // 1. ПРОВЕРЯЕМ БАН
+            // Если аккаунт в бане
             if (userSnap.exists() && userSnap.val().banned === true) {
-                alert("🚫 Ваш аккаунт заблокирован администрацией за нарушение правил KotoGram.");
-                await signOut(auth); // Мгновенно выкидываем
-                window.location.reload(); // Перезагружаем страницу
+                alert("🚫 Ваш аккаунт заблокирован администрацией.");
+                await signOut(auth);
+                window.location.reload();
                 return;
             }
 
-            // 2. ЕСЛИ НОВЕНЬКИЙ - СОЗДАЕМ ПРОФИЛЬ
+            // Если новый юзер
             if (!userSnap.exists()) {
                 await set(userRef, {
                     uid: user.uid,
@@ -45,27 +44,16 @@ onAuthStateChanged(auth, async (user) => {
                 });
             }
 
-            // 3. ЕСЛИ ВСЁ ОК - ПУСКАЕМ В МЕССЕНДЖЕР
+            // Пускаем в мессенджер
             window.location.href = "../main/main.html";
 
         } catch (error) {
-            console.error("Ошибка при проверке пользователя:", error);
-            alert("Ошибка подключения к базе данных.");
+            console.error("Ошибка проверки юзера:", error);
         }
     }
 });
 
-// --- БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ КАПЧИ ---
-// Создаем независимый контейнер для капчи, чтобы она не ломала кнопку
-const recaptchaDiv = document.createElement('div');
-recaptchaDiv.id = 'recaptcha-container';
-document.body.appendChild(recaptchaDiv);
-
-window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-    'size': 'invisible'
-});
-
-// --- ШАГ 1: ОТПРАВКА СМС ---
+// --- ЖЕЛЕЗОБЕТОННАЯ ОТПРАВКА СМС ---
 document.getElementById('send-code-btn').onclick = async () => {
     const phoneNumber = document.getElementById('phone-number').value.trim();
     const errorEl = document.getElementById('login-error');
@@ -78,31 +66,45 @@ document.getElementById('send-code-btn').onclick = async () => {
 
     const btn = document.getElementById('send-code-btn');
     btn.disabled = true;
-    btn.textContent = "Отправка...";
+    btn.textContent = "Загрузка капчи...";
 
     try {
-        const appVerifier = window.recaptchaVerifier;
-        confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+        // 1. Чистим старую капчу, если она зависла с прошлого клика
+        if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.clear();
+            window.recaptchaVerifier = null;
+        }
+        const oldDiv = document.getElementById('recaptcha-container');
+        if (oldDiv) oldDiv.remove();
+
+        // 2. Создаем чистый контейнер
+        const recaptchaDiv = document.createElement('div');
+        recaptchaDiv.id = 'recaptcha-container';
+        document.body.appendChild(recaptchaDiv);
+
+        // 3. Инициализируем новую капчу
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible'
+        });
+
+        // 4. Пробуем отправить СМС
+        btn.textContent = "Отправка СМС...";
+        confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
         
-        // СМС отправлено успешно
+        // 5. Успех! Переходим к вводу кода
         document.getElementById('step-1').style.display = 'none';
         document.getElementById('step-2').style.display = 'block';
+
     } catch (error) {
-        console.error(error);
-        errorEl.textContent = "Ошибка отправки СМС. Проверьте формат номера (+7...).";
+        console.error("Firebase Error:", error);
+        // ТЕПЕРЬ МЫ УВИДИМ РЕАЛЬНУЮ ОШИБКУ НА ЭКРАНЕ
+        errorEl.textContent = "Ошибка: " + error.message; 
         btn.disabled = false;
         btn.textContent = "Получить код";
-        
-        // Сбрасываем капчу при ошибке, чтобы можно было нажать еще раз
-        if (window.recaptchaVerifier) {
-            window.recaptchaVerifier.render().then(function(widgetId) {
-                grecaptcha.reset(widgetId);
-            });
-        }
     }
 };
 
-// --- ШАГ 2: ПРОВЕРКА КОДА ИЗ СМС ---
+// --- ПРОВЕРКА КОДА ИЗ СМС ---
 document.getElementById('verify-code-btn').onclick = () => {
     const code = document.getElementById('verification-code').value.trim();
     const errorEl = document.getElementById('login-error');
@@ -113,10 +115,9 @@ document.getElementById('verify-code-btn').onclick = () => {
         return;
     }
 
-    confirmationResult.confirm(code).then((result) => {
-        // Код верный! Сработает onAuthStateChanged наверху
-    }).catch((error) => {
+    confirmationResult.confirm(code).catch((error) => {
         console.error(error);
         errorEl.textContent = "Неверный код из СМС!";
     });
 };
+                                                         
