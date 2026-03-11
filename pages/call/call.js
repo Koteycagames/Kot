@@ -16,11 +16,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// Настройки серверов для пробития NAT (чтобы видео шло даже если вы в разных сетях)
+// ФИКС: Расширенный список STUN-серверов для пробития роутеров
 const configuration = {
     iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' } // Мощный резерв
     ]
 };
 
@@ -28,21 +31,20 @@ let peerConnection = null;
 let localStream = null;
 let remoteStream = null;
 let roomId = null;
-let mode = null; // 'caller' или 'receiver'
+let mode = null; 
 let currentUser = null;
+let iceCandidatesQueue = []; // Очередь маршрутов
 
-// Элементы UI
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const callStatus = document.getElementById('call-status');
 const statusSubtitle = document.getElementById('call-subtitle');
+const statusTitle = callStatus.querySelector('h2');
 
-// Кнопки
 const hangupBtn = document.getElementById('hangup-btn');
 const toggleAudioBtn = document.getElementById('toggle-audio-btn');
 const toggleVideoBtn = document.getElementById('toggle-video-btn');
 
-// Читаем параметры из URL (какая комната и кто мы)
 const urlParams = new URLSearchParams(window.location.search);
 roomId = urlParams.get('room');
 mode = urlParams.get('mode');
@@ -51,7 +53,7 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         if (!roomId || !mode) {
-            alert("Ошибка параметров звонка!");
+            alert("Ошибка звонка!");
             window.location.href = "../main/main.html";
             return;
         }
@@ -61,42 +63,51 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// 1. Получаем доступ к камере и микрофону
 async function initMedia() {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.srcObject = localStream;
-        
         statusSubtitle.textContent = "Подключение к серверу...";
         setupWebRTC();
     } catch (error) {
-        console.error("Ошибка доступа к камере:", error);
-        callStatus.querySelector('h2').textContent = "Камера недоступна";
-        statusSubtitle.textContent = "Проверьте разрешения в браузере";
+        console.error("Ошибка камеры:", error);
+        statusTitle.textContent = "Нет доступа к камере";
+        statusSubtitle.textContent = "Разрешите доступ в настройках браузера";
     }
 }
 
-// 2. Настраиваем WebRTC соединение
 async function setupWebRTC() {
     peerConnection = new RTCPeerConnection(configuration);
 
-    // Добавляем наши треки (видео и звук) в соединение
+    // Добавляем наши треки
     localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
     });
 
-    // Готовим место под видео собеседника
     remoteStream = new MediaStream();
     remoteVideo.srcObject = remoteStream;
 
-    // Как только получаем трек от собеседника - добавляем его в плеер
     peerConnection.ontrack = event => {
         event.streams[0].getTracks().forEach(track => {
             remoteStream.addTrack(track);
         });
-        // Убираем черный экран, когда появилось видео
-        callStatus.style.opacity = '0'; 
-        setTimeout(() => callStatus.style.display = 'none', 500);
+    };
+
+    // ФИКС: Мониторинг состояния связи с выводом на экран
+    peerConnection.oniceconnectionstatechange = () => {
+        if (peerConnection.iceConnectionState === 'connected') {
+            callStatus.style.opacity = '0'; 
+            setTimeout(() => callStatus.style.display = 'none', 500);
+        } else if (peerConnection.iceConnectionState === 'disconnected') {
+            callStatus.style.display = 'flex';
+            callStatus.style.opacity = '1';
+            statusTitle.textContent = "Слабый интернет...";
+            statusSubtitle.textContent = "Попытка переподключения";
+        } else if (peerConnection.iceConnectionState === 'failed') {
+            statusTitle.textContent = "Связь потеряна";
+            statusSubtitle.textContent = "Не удалось пробить фаервол";
+            setTimeout(hangup, 3000);
+        }
     };
 
     if (mode === 'caller') {
@@ -108,57 +119,66 @@ async function setupWebRTC() {
     listenForHangup();
 }
 
-// 3. Логика звонящего (Создаем комнату)
+// Вспомогательная функция: безопасное добавление ICE
+async function addIceCandidateSafely(candidateData) {
+    if (peerConnection.remoteDescription) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidateData));
+    } else {
+        iceCandidatesQueue.push(candidateData);
+    }
+}
+
+function processIceQueue() {
+    while (iceCandidatesQueue.length > 0) {
+        const candidateData = iceCandidatesQueue.shift();
+        peerConnection.addIceCandidate(new RTCIceCandidate(candidateData)).catch(e => console.error(e));
+    }
+}
+
 async function createOffer() {
-    callStatus.querySelector('h2').textContent = "Вызов...";
+    statusTitle.textContent = "Вызов...";
     statusSubtitle.textContent = "Ждем ответа собеседника";
 
     const roomRef = ref(db, `calls/${roomId}`);
     const callerCandidatesRef = ref(db, `calls/${roomId}/callerCandidates`);
     const receiverCandidatesRef = ref(db, `calls/${roomId}/receiverCandidates`);
 
-    // Собираем ICE кандидаты (маршруты связи) и шлем в базу
     peerConnection.onicecandidate = event => {
         if (event.candidate) push(callerCandidatesRef, event.candidate.toJSON());
     };
 
-    // Создаем предложение связи (Offer)
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
 
-    const roomWithOffer = {
+    await set(roomRef, {
         offer: { type: offer.type, sdp: offer.sdp },
         caller: currentUser.uid,
         status: 'calling'
-    };
-    await set(roomRef, roomWithOffer);
+    });
 
-    // Ждем, пока собеседник ответит (появится Answer в базе)
     onValue(roomRef, async snapshot => {
         const data = snapshot.val();
         if (!peerConnection.currentRemoteDescription && data && data.answer) {
             const answer = new RTCSessionDescription(data.answer);
             await peerConnection.setRemoteDescription(answer);
+            processIceQueue(); // Применяем маршруты только после установки связи
         }
     });
 
-    // Слушаем маршруты (ICE) от собеседника
     onChildAdded(receiverCandidatesRef, snapshot => {
-        const candidate = new RTCIceCandidate(snapshot.val());
-        peerConnection.addIceCandidate(candidate);
+        const data = snapshot.val();
+        if (data) addIceCandidateSafely(data);
     });
 }
 
-// 4. Логика отвечающего (Принимаем звонок)
 async function joinCall() {
-    callStatus.querySelector('h2').textContent = "Соединение...";
-    statusSubtitle.textContent = "Установка защищенного канала";
+    statusTitle.textContent = "Соединение...";
+    statusSubtitle.textContent = "Установка канала связи";
 
     const roomRef = ref(db, `calls/${roomId}`);
     const callerCandidatesRef = ref(db, `calls/${roomId}/callerCandidates`);
     const receiverCandidatesRef = ref(db, `calls/${roomId}/receiverCandidates`);
 
-    // Шлем свои ICE кандидаты
     peerConnection.onicecandidate = event => {
         if (event.candidate) push(receiverCandidatesRef, event.candidate.toJSON());
     };
@@ -168,76 +188,68 @@ async function joinCall() {
         const data = roomSnapshot.val();
         const offer = data.offer;
         
-        // Принимаем предложение
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
         
-        // Создаем ответ
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
-        // Обновляем комнату в базе
         await set(ref(db, `calls/${roomId}/answer`), { type: answer.type, sdp: answer.sdp });
         await set(ref(db, `calls/${roomId}/status`), 'answered');
+        
+        processIceQueue(); // Применяем накопленные маршруты
 
-        // Получаем маршруты от того, кто звонил
         onChildAdded(callerCandidatesRef, snapshot => {
-            const candidate = new RTCIceCandidate(snapshot.val());
-            peerConnection.addIceCandidate(candidate);
+            const data = snapshot.val();
+            if (data) addIceCandidateSafely(data);
         });
     } else {
-        alert("Звонок завершен или не существует.");
+        alert("Звонок сброшен");
         hangup();
     }
 }
 
-// 5. Управление кнопками
 toggleAudioBtn.onclick = () => {
     const audioTrack = localStream.getAudioTracks()[0];
-    audioTrack.enabled = !audioTrack.enabled;
-    toggleAudioBtn.classList.toggle('disabled');
-    toggleAudioBtn.querySelector('.material-icons').textContent = audioTrack.enabled ? 'mic' : 'mic_off';
+    if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        toggleAudioBtn.classList.toggle('disabled');
+        toggleAudioBtn.querySelector('.material-icons').textContent = audioTrack.enabled ? 'mic' : 'mic_off';
+    }
 };
 
 toggleVideoBtn.onclick = () => {
     const videoTrack = localStream.getVideoTracks()[0];
-    videoTrack.enabled = !videoTrack.enabled;
-    toggleVideoBtn.classList.toggle('disabled');
-    toggleVideoBtn.querySelector('.material-icons').textContent = videoTrack.enabled ? 'videocam' : 'videocam_off';
+    if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        toggleVideoBtn.classList.toggle('disabled');
+        toggleVideoBtn.querySelector('.material-icons').textContent = videoTrack.enabled ? 'videocam' : 'videocam_off';
+    }
 };
 
-// 6. Завершение звонка
 async function hangup() {
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-    }
-    if (remoteStream) {
-        remoteStream.getTracks().forEach(track => track.stop());
-    }
-    if (peerConnection) {
-        peerConnection.close();
-    }
+    if (localStream) localStream.getTracks().forEach(track => track.stop());
+    if (remoteStream) remoteStream.getTracks().forEach(track => track.stop());
+    if (peerConnection) peerConnection.close();
 
-    // Удаляем комнату из Firebase, чтобы у собеседника тоже сбросилось
     if (roomId) {
         await remove(ref(db, `calls/${roomId}`));
     }
-
     window.location.href = "../main/main.html";
 }
 
 hangupBtn.onclick = hangup;
 
-// Если собеседник положил трубку - удалилась комната
 function listenForHangup() {
     onValue(ref(db, `calls/${roomId}`), snapshot => {
         if (!snapshot.exists()) {
             callStatus.style.display = 'flex';
             callStatus.style.opacity = '1';
-            callStatus.querySelector('h2').textContent = "Звонок завершен";
+            statusTitle.textContent = "Звонок завершен";
             statusSubtitle.textContent = "";
             setTimeout(() => {
                 window.location.href = "../main/main.html";
-            }, 1500);
+            }, 1000);
         }
     });
-}
+            }
+            
