@@ -22,7 +22,6 @@ let currentChatUser = null;
 let unsubscribeMessages = null;
 let activeIncomingCallId = null;
 
-// ПРОВЕРКА АВТОРИЗАЦИИ
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
@@ -36,7 +35,6 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// --- ВЫДВИЖНОЕ МЕНЮ (DRAWER) ---
 const drawer = document.getElementById('drawer');
 const drawerOverlay = document.getElementById('drawer-overlay');
 
@@ -53,7 +51,6 @@ drawerOverlay.onclick = () => {
 document.getElementById('btn-settings').onclick = () => window.location.href = "../settings/settings.html";
 document.getElementById('drawer-logout-btn').onclick = () => signOut(auth);
 
-// --- СИСТЕМА ЗВОНКОВ ---
 document.getElementById('call-btn').onclick = async () => {
     if (!currentChatUser) return;
     const roomRef = push(ref(db, 'calls'));
@@ -101,9 +98,7 @@ function listenForIncomingCalls() {
         }
     });
 }
-// --- КОНЕЦ СИСТЕМЫ ЗВОНКОВ ---
 
-// ПОИСК И НОВЫЙ ЧАТ
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -139,7 +134,6 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
     } catch (e) { errorEl.textContent = "Ошибка базы данных."; }
 };
 
-// ОТКРЫТИЕ ЧАТА
 function openChat(user) {
     currentChatUser = user;
     document.getElementById('no-chat-selected').style.display = 'none';
@@ -151,9 +145,6 @@ function openChat(user) {
 
 document.getElementById('back-to-sidebar-btn').onclick = () => document.getElementById('app-viewport').classList.remove('chat-open');
 
-// ==========================================
-// НОВАЯ СИСТЕМА СООБЩЕНИЙ (ВРЕМЯ И ГАЛОЧКИ)
-// ==========================================
 function loadMessages() {
     if (unsubscribeMessages) unsubscribeMessages();
     const chatId = currentUser.uid < currentChatUser.uid ? 
@@ -169,7 +160,7 @@ function loadMessages() {
             const msgKey = child.key;
             const isMine = msg.senderId === currentUser.uid;
 
-            // ЕСЛИ СООБЩЕНИЕ НЕ НАШЕ И ОНО НЕ ПРОЧИТАНО -> ПОМЕЧАЕМ КАК ПРОЧИТАННОЕ
+            // Меняем статус на "прочитано", только если сообщение чужое и еще не прочитано
             if (!isMine && msg.status !== 'read') {
                 update(ref(db, `chats/${chatId}/messages/${msgKey}`), { status: 'read' });
             }
@@ -177,38 +168,35 @@ function loadMessages() {
             const div = document.createElement('div');
             div.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
             div.style.background = isMine ? '#effdde' : '#fff';
-            // Добавили нижний padding (20px) под время и галочки
-            div.style.padding = '8px 12px 20px 12px'; 
+            div.style.padding = '8px 12px 20px 12px'; // Место под время и галочки
             div.style.borderRadius = '12px'; 
             div.style.margin = '4px 0';
             div.style.maxWidth = '85%'; 
             div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
-            div.style.position = 'relative'; // Для абсолютного позиционирования времени
+            div.style.position = 'relative';
 
-            // 1. Обработка времени
+            // Умная обработка времени
             let timeString = '';
-            if (msg.timestamp) {
-                const date = new Date(msg.timestamp);
+            const timeToUse = msg.timestamp || Date.now();
+            const date = new Date(timeToUse);
+            if (!isNaN(date)) {
                 timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
 
-            // 2. Обработка галочек
+            // Галочки
             let ticksHtml = '';
             if (isMine) {
                 if (msg.status === 'read') {
-                    // Две зеленые галочки
-                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #4caf50;">done_all</span>`;
+                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #4caf50;">done_all</span>`; // Две зеленые
                 } else {
-                    // Одна серая галочка
-                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #888;">done</span>`;
+                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #888;">done</span>`; // Одна серая
                 }
             }
 
-            // 3. Собираем сообщение
             if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
             if (msg.text) div.innerHTML += `<span style="word-break: break-word; line-height: 1.4;">${msg.text}</span>`;
             
-            // 4. Добавляем блок метаданных (Время + Галочки) в правый нижний угол
+            // Блок времени и галочек
             div.innerHTML += `
                 <div style="position: absolute; bottom: 4px; right: 10px; display: flex; align-items: center; gap: 3px; font-size: 11px; color: #8a8a8a;">
                     <span>${timeString}</span>
@@ -227,7 +215,6 @@ document.getElementById('send-btn').onclick = () => {
     if (text) sendMessage(text);
 };
 
-// ОБНОВЛЕННАЯ ОТПРАВКА СТАТУСА
 function sendMessage(text = '', img = null) {
     if (!currentChatUser) return;
     const myUid = currentUser.uid;
@@ -239,7 +226,7 @@ function sendMessage(text = '', img = null) {
         text: text,
         imageUrl: img,
         timestamp: serverTimestamp(),
-        status: 'sent' // <--- Добавили статус "отправлено"
+        status: 'sent'
     });
 
     set(ref(db, `userChats/${myUid}/${otherUid}`), true);
@@ -248,7 +235,6 @@ function sendMessage(text = '', img = null) {
     document.getElementById('message-input').value = '';
 }
 
-// ЗАГРУЗКА ЧАТОВ
 function loadMyActiveChats() {
     const myChatsRef = ref(db, 'userChats/' + currentUser.uid);
     onValue(myChatsRef, async (snapshot) => {
@@ -277,7 +263,6 @@ function loadMyActiveChats() {
     });
 }
 
-// ИЗОБРАЖЕНИЯ
 document.getElementById('attach-btn').onclick = () => document.getElementById('image-input').click();
 document.getElementById('image-input').onchange = (e) => {
     const f = e.target.files[0];
@@ -308,4 +293,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-                                  
+                                             
