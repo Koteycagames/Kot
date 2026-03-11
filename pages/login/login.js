@@ -30,8 +30,8 @@ onAuthStateChanged(auth, async (user) => {
             // 1. ПРОВЕРЯЕМ БАН
             if (userSnap.exists() && userSnap.val().banned === true) {
                 alert("🚫 Ваш аккаунт заблокирован администрацией за нарушение правил KotoGram.");
-                await signOut(auth); // Мгновенно выкидываем из аккаунта
-                window.location.reload(); // Перезагружаем страницу логина
+                await signOut(auth); // Мгновенно выкидываем
+                window.location.reload(); // Перезагружаем страницу
                 return;
             }
 
@@ -55,13 +55,15 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- НАСТРОЙКА RECAPTCHA (ЗАЩИТА ОТ БОТОВ) ---
-window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+// --- ИСПРАВЛЕННАЯ НАСТРОЙКА RECAPTCHA (Firebase v9) ---
+// auth теперь передается ПЕРВЫМ параметром!
+// И капча жестко привязана к кнопке 'send-code-btn'
+window.recaptchaVerifier = new RecaptchaVerifier(auth, 'send-code-btn', {
     'size': 'invisible',
     'callback': (response) => {
         // Капча пройдена
     }
-}, auth);
+});
 
 // --- ШАГ 1: ОТПРАВКА СМС ---
 document.getElementById('send-code-btn').onclick = () => {
@@ -85,10 +87,12 @@ document.getElementById('send-code-btn').onclick = () => {
         }).catch((error) => {
             console.error(error);
             errorEl.textContent = "Ошибка отправки СМС. Проверьте формат номера (+7...).";
-            // Сбрасываем капчу при ошибке
-            window.recaptchaVerifier.render().then(function(widgetId) {
-                grecaptcha.reset(widgetId);
-            });
+            // Сбрасываем капчу при ошибке, чтобы можно было нажать еще раз
+            if (window.recaptchaVerifier) {
+                window.recaptchaVerifier.render().then(function(widgetId) {
+                    grecaptcha.reset(widgetId);
+                });
+            }
         });
 };
 
