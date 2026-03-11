@@ -55,18 +55,18 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- ИСПРАВЛЕННАЯ НАСТРОЙКА RECAPTCHA (Firebase v9) ---
-// auth теперь передается ПЕРВЫМ параметром!
-// И капча жестко привязана к кнопке 'send-code-btn'
-window.recaptchaVerifier = new RecaptchaVerifier(auth, 'send-code-btn', {
-    'size': 'invisible',
-    'callback': (response) => {
-        // Капча пройдена
-    }
+// --- БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ КАПЧИ ---
+// Создаем независимый контейнер для капчи, чтобы она не ломала кнопку
+const recaptchaDiv = document.createElement('div');
+recaptchaDiv.id = 'recaptcha-container';
+document.body.appendChild(recaptchaDiv);
+
+window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+    'size': 'invisible'
 });
 
 // --- ШАГ 1: ОТПРАВКА СМС ---
-document.getElementById('send-code-btn').onclick = () => {
+document.getElementById('send-code-btn').onclick = async () => {
     const phoneNumber = document.getElementById('phone-number').value.trim();
     const errorEl = document.getElementById('login-error');
     errorEl.textContent = '';
@@ -76,24 +76,30 @@ document.getElementById('send-code-btn').onclick = () => {
         return;
     }
 
-    const appVerifier = window.recaptchaVerifier;
+    const btn = document.getElementById('send-code-btn');
+    btn.disabled = true;
+    btn.textContent = "Отправка...";
 
-    signInWithPhoneNumber(auth, phoneNumber, appVerifier)
-        .then((result) => {
-            // СМС отправлено успешно
-            confirmationResult = result;
-            document.getElementById('step-1').style.display = 'none'; // Скрываем ввод номера
-            document.getElementById('step-2').style.display = 'block'; // Показываем ввод кода
-        }).catch((error) => {
-            console.error(error);
-            errorEl.textContent = "Ошибка отправки СМС. Проверьте формат номера (+7...).";
-            // Сбрасываем капчу при ошибке, чтобы можно было нажать еще раз
-            if (window.recaptchaVerifier) {
-                window.recaptchaVerifier.render().then(function(widgetId) {
-                    grecaptcha.reset(widgetId);
-                });
-            }
-        });
+    try {
+        const appVerifier = window.recaptchaVerifier;
+        confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+        
+        // СМС отправлено успешно
+        document.getElementById('step-1').style.display = 'none';
+        document.getElementById('step-2').style.display = 'block';
+    } catch (error) {
+        console.error(error);
+        errorEl.textContent = "Ошибка отправки СМС. Проверьте формат номера (+7...).";
+        btn.disabled = false;
+        btn.textContent = "Получить код";
+        
+        // Сбрасываем капчу при ошибке, чтобы можно было нажать еще раз
+        if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.render().then(function(widgetId) {
+                grecaptcha.reset(widgetId);
+            });
+        }
+    }
 };
 
 // --- ШАГ 2: ПРОВЕРКА КОДА ИЗ СМС ---
@@ -108,7 +114,7 @@ document.getElementById('verify-code-btn').onclick = () => {
     }
 
     confirmationResult.confirm(code).then((result) => {
-        // Код верный! Сработает onAuthStateChanged наверху и проверит бан.
+        // Код верный! Сработает onAuthStateChanged наверху
     }).catch((error) => {
         console.error(error);
         errorEl.textContent = "Неверный код из СМС!";
