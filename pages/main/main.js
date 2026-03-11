@@ -21,14 +21,92 @@ let currentUser = null;
 let currentChatUser = null;
 let unsubscribeMessages = null;
 let activeIncomingCallId = null;
-let isMessageSending = false; // Блокировка от двойного клика!
+let isMessageSending = false;
 
+// --- СОЗДАЕМ КОНТЕКСТНОЕ МЕНЮ НА ЛЕТУ ---
+const contextMenu = document.createElement('div');
+contextMenu.style.cssText = `
+    position: fixed; display: none; background: white; border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 3000; overflow: hidden;
+    flex-direction: column; min-width: 160px; border: 1px solid #eee;
+`;
+document.body.appendChild(contextMenu);
+
+// Закрываем меню при клике в любое другое место
+document.addEventListener('click', () => {
+    contextMenu.style.display = 'none';
+});
+
+// Функция показа меню
+function showContextMenu(x, y, msgKey, msg, isMine, chatId) {
+    contextMenu.innerHTML = ''; // Очищаем старые кнопки
+    
+    // Если сообщение уже удалено, меню не показываем
+    if (msg.isDeleted) return;
+
+    // Кнопка "Изменить" (Только для своих текстовых сообщений)
+    if (isMine && !msg.imageUrl) {
+        const editBtn = document.createElement('div');
+        editBtn.innerHTML = '<span class="material-icons" style="font-size: 18px; margin-right: 8px;">edit</span> Изменить';
+        editBtn.style.cssText = 'padding: 12px 15px; display: flex; align-items: center; cursor: pointer; color: #333; font-size: 15px; border-bottom: 1px solid #eee;';
+        editBtn.onmouseover = () => editBtn.style.background = '#f5f5f5';
+        editBtn.onmouseout = () => editBtn.style.background = 'white';
+        editBtn.onclick = () => {
+            const newText = prompt("Редактировать сообщение:", msg.text);
+            if (newText !== null && newText.trim() !== "" && newText !== msg.text) {
+                update(ref(db, `chats/${chatId}/messages/${msgKey}`), {
+                    text: newText.trim(),
+                    isEdited: true,
+                    editTime: serverTimestamp()
+                });
+                
+                // Обновляем превью в списке чатов
+                const myUid = currentUser.uid;
+                const otherUid = currentChatUser.uid;
+                update(ref(db, `userChats/${myUid}/${otherUid}`), { lastMessage: newText.trim() });
+                update(ref(db, `userChats/${otherUid}/${myUid}`), { lastMessage: newText.trim() });
+            }
+        };
+        contextMenu.appendChild(editBtn);
+    }
+
+    // Кнопка "Удалить" (Доступна для всех сообщений)
+    const delBtn = document.createElement('div');
+    delBtn.innerHTML = '<span class="material-icons" style="font-size: 18px; margin-right: 8px;">delete</span> Удалить';
+    delBtn.style.cssText = 'padding: 12px 15px; display: flex; align-items: center; cursor: pointer; color: #e53935; font-size: 15px;';
+    delBtn.onmouseover = () => delBtn.style.background = '#ffebee';
+    delBtn.onmouseout = () => delBtn.style.background = 'white';
+    delBtn.onclick = () => {
+        const userName = currentUser.displayName || currentUser.phoneNumber;
+        const tombstoneText = msg.imageUrl 
+            ? `Фотография удалена пользователем ${userName}` 
+            : `Сообщение удалил ${userName}`;
+
+        update(ref(db, `chats/${chatId}/messages/${msgKey}`), {
+            isDeleted: true,
+            text: tombstoneText,
+            imageUrl: null // Удаляем саму картинку
+        });
+    };
+    contextMenu.appendChild(delBtn);
+
+    // Корректируем позицию, чтобы не вылезало за экран
+    contextMenu.style.display = 'flex';
+    let posX = x;
+    let posY = y;
+    if (posX + 160 > window.innerWidth) posX = window.innerWidth - 170;
+    if (posY + contextMenu.offsetHeight > window.innerHeight) posY = window.innerHeight - contextMenu.offsetHeight - 10;
+    
+    contextMenu.style.left = posX + 'px';
+    contextMenu.style.top = posY + 'px';
+}
+
+// ПРОВЕРКА АВТОРИЗАЦИИ
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
         document.getElementById('drawer-display-name').textContent = user.displayName || "Мой профиль";
         document.getElementById('drawer-phone-number').textContent = user.phoneNumber;
-        
         loadMyActiveChats();
         listenForIncomingCalls(); 
     } else {
@@ -44,12 +122,10 @@ document.getElementById('burger-menu-btn').onclick = () => {
     drawer.classList.add('open');
     drawerOverlay.classList.add('open');
 };
-
 drawerOverlay.onclick = () => {
     drawer.classList.remove('open');
     drawerOverlay.classList.remove('open');
 };
-
 document.getElementById('btn-settings').onclick = () => window.location.href = "../settings/settings.html";
 document.getElementById('drawer-logout-btn').onclick = () => signOut(auth);
 
@@ -165,7 +241,7 @@ function loadMessages() {
             const msgKey = child.key;
             const isMine = msg.senderId === currentUser.uid;
 
-            if (!isMine && msg.status !== 'read') {
+            if (!isMine && msg.status !== 'read' && !msg.isDeleted) {
                 update(ref(db, `chats/${chatId}/messages/${msgKey}`), { status: 'read' });
             }
 
@@ -180,11 +256,45 @@ function loadMessages() {
             div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
             div.style.position = 'relative';
 
+            // --- ОБРАБОТЧИКИ ДЛЯ КОНТЕКСТНОГО МЕНЮ ---
+            let pressTimer;
+            // Для ПК (Правая кнопка мыши)
+            div.oncontextmenu = (e) => {
+                e.preventDefault(); // Убираем стандартное меню браузера
+                showContextMenu(e.clientX, e.clientY, msgKey, msg, isMine, chatId);
+            };
+            // Для Телефонов (Долгое нажатие)
+            div.ontouchstart = (e) => {
+                pressTimer = setTimeout(() => {
+                    showContextMenu(e.touches[0].clientX, e.touches[0].clientY, msgKey, msg, isMine, chatId);
+                }, 500); // 0.5 секунды для вызова меню
+            };
+            div.ontouchend = () => clearTimeout(pressTimer);
+            div.ontouchmove = () => clearTimeout(pressTimer);
+            // ----------------------------------------
+
+            // Если сообщение УДАЛЕНО
+            if (msg.isDeleted) {
+                div.style.background = isMine ? '#f1f8e9' : '#f5f5f5';
+                div.innerHTML = `<span style="color: #888; font-style: italic; font-size: 14px;">${msg.text}</span>`;
+                container.appendChild(div);
+                return; // Дальше не рендерим картинки и галочки
+            }
+
             let timeString = '';
             const timeToUse = msg.timestamp || Date.now();
             const date = new Date(timeToUse);
             if (!isNaN(date)) {
                 timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            // Рендер надписи "Изменено"
+            let editedHtml = '';
+            if (msg.isEdited && msg.editTime) {
+                const editDate = new Date(msg.editTime);
+                if (!isNaN(editDate)) {
+                    editedHtml = `<span style="font-style: italic; margin-right: 5px;">изменено в ${editDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>`;
+                }
             }
 
             let ticksHtml = '';
@@ -200,7 +310,8 @@ function loadMessages() {
             if (msg.text) div.innerHTML += `<span style="word-break: break-word; line-height: 1.4;">${msg.text}</span>`;
             
             div.innerHTML += `
-                <div style="position: absolute; bottom: 4px; right: 10px; display: flex; align-items: center; gap: 3px; font-size: 11px; color: #8a8a8a;">
+                <div style="position: absolute; bottom: 4px; right: 10px; display: flex; align-items: center; gap: 3px; font-size: 11px; color: #8a8a8a; white-space: nowrap;">
+                    ${editedHtml}
                     <span>${timeString}</span>
                     ${ticksHtml}
                 </div>
@@ -212,28 +323,23 @@ function loadMessages() {
     });
 }
 
-// --- ОТПРАВКА СООБЩЕНИЯ С ЗАЩИТОЙ ОТ ДЮПОВ ---
+// --- ОТПРАВКА СООБЩЕНИЯ ---
 document.getElementById('send-btn').onclick = () => {
-    if (isMessageSending) return; // Если уже отправляем - игнорируем клик
-    
+    if (isMessageSending) return; 
     const input = document.getElementById('message-input');
     const text = input.value.trim();
-    
     if (text) {
-        isMessageSending = true; // Ставим замок
-        input.value = ''; // Моментально очищаем инпут для визуала
+        isMessageSending = true; 
+        input.value = ''; 
         sendMessage(text);
-        
-        // Снимаем замок через 500мс (защита от двойного тапа)
         setTimeout(() => { isMessageSending = false; }, 500);
     }
 };
 
-// БОНУС: Отправка по нажатию Enter (Shift+Enter делает перенос строки)
 document.getElementById('message-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault(); // Останавливаем стандартный перенос строки
-        document.getElementById('send-btn').click(); // Имитируем клик по кнопке
+        e.preventDefault(); 
+        document.getElementById('send-btn').click(); 
     }
 });
 
@@ -244,7 +350,6 @@ function sendMessage(text = '', img = null) {
     const chatId = myUid < otherUid ? `${myUid}_${otherUid}` : `${otherUid}_${myUid}`;
     
     const time = serverTimestamp();
-    
     let snippet = text;
     if (!snippet && img) snippet = '📷 Фото';
 
@@ -266,8 +371,7 @@ function sendMessage(text = '', img = null) {
     });
 }
 
-
-// --- ПРОДВИНУТАЯ ЗАГРУЗКА СПИСКА ЧАТОВ ---
+// --- ЗАГРУЗКА СПИСКА ЧАТОВ ---
 function loadMyActiveChats() {
     const myChatsRef = ref(db, 'userChats/' + currentUser.uid);
     onValue(myChatsRef, async (snapshot) => {
@@ -356,4 +460,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-        
+                        
