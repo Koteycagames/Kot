@@ -20,13 +20,16 @@ const db = getDatabase(app);
 let currentUser = null;
 let currentChatUser = null;
 let unsubscribeMessages = null;
-let activeIncomingCallId = null; // ФИКС: Запоминаем текущий звонок
+let activeIncomingCallId = null;
 
+// ПРОВЕРКА АВТОРИЗАЦИИ
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
-        document.getElementById('my-display-name').textContent = user.displayName || "Мой профиль";
-        document.getElementById('my-phone-number').textContent = user.phoneNumber;
+        // Заполняем профиль в боковом меню!
+        document.getElementById('drawer-display-name').textContent = user.displayName || "Мой профиль";
+        document.getElementById('drawer-phone-number').textContent = user.phoneNumber;
+        
         loadMyActiveChats();
         listenForIncomingCalls(); 
     } else {
@@ -34,10 +37,31 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-document.getElementById('logout-btn').onclick = () => signOut(auth);
+// --- ВЫДВИЖНОЕ МЕНЮ (DRAWER) ---
+const drawer = document.getElementById('drawer');
+const drawerOverlay = document.getElementById('drawer-overlay');
+
+document.getElementById('burger-menu-btn').onclick = () => {
+    drawer.classList.add('open');
+    drawerOverlay.classList.add('open');
+};
+
+// Закрываем меню по клику на затемненный фон
+drawerOverlay.onclick = () => {
+    drawer.classList.remove('open');
+    drawerOverlay.classList.remove('open');
+};
+
+// Кнопка Настройки
+document.getElementById('btn-settings').onclick = () => {
+    window.location.href = "../settings/settings.html";
+};
+
+// Кнопка Выхода (переехала в меню)
+document.getElementById('drawer-logout-btn').onclick = () => signOut(auth);
+
 
 // --- СИСТЕМА ЗВОНКОВ ---
-
 document.getElementById('call-btn').onclick = async () => {
     if (!currentChatUser) return;
     
@@ -54,9 +78,7 @@ document.getElementById('call-btn').onclick = async () => {
     window.location.href = `../call/call.html?room=${roomId}&mode=caller`;
 };
 
-// ИСПРАВЛЕННЫЙ СЛУХАЧ ЗВОНКОВ
 function listenForIncomingCalls() {
-    // Слушаем только те звонки, где получатель - МЫ
     const callsRef = query(ref(db, 'calls'), orderByChild('receiver'), equalTo(currentUser.uid));
     
     onValue(callsRef, async (snapshot) => {
@@ -74,10 +96,8 @@ function listenForIncomingCalls() {
         const modal = document.getElementById('incoming-call-modal');
         
         if (incomingCallData && activeRoomId) {
-            // ГЛАВНЫЙ ФИКС: Если мы УЖЕ звоним по этому ID, не сбрасываем окно!
             if (activeIncomingCallId === activeRoomId) return;
-            
-            activeIncomingCallId = activeRoomId; // Записываем, что звонок начался
+            activeIncomingCallId = activeRoomId;
             
             const callerSnap = await get(ref(db, 'users/' + incomingCallData.caller));
             const callerName = callerSnap.exists() ? (callerSnap.val().displayName || callerSnap.val().phoneNumber) : "Неизвестный";
@@ -96,7 +116,6 @@ function listenForIncomingCalls() {
                 activeIncomingCallId = null;
             };
         } else {
-            // Если звонок сбросили на той стороне
             modal.style.display = 'none';
             activeIncomingCallId = null;
         }
@@ -104,6 +123,7 @@ function listenForIncomingCalls() {
 }
 // --- КОНЕЦ СИСТЕМЫ ЗВОНКОВ ---
 
+// ПОИСК И НОВЫЙ ЧАТ
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -151,6 +171,7 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
     }
 };
 
+// ОТКРЫТИЕ ЧАТА
 function openChat(user) {
     currentChatUser = user;
     document.getElementById('no-chat-selected').style.display = 'none';
@@ -164,6 +185,7 @@ document.getElementById('back-to-sidebar-btn').onclick = () => {
     document.getElementById('app-viewport').classList.remove('chat-open');
 };
 
+// СООБЩЕНИЯ
 function loadMessages() {
     if (unsubscribeMessages) unsubscribeMessages();
     const chatId = currentUser.uid < currentChatUser.uid ? 
@@ -214,6 +236,7 @@ function sendMessage(text = '', img = null) {
     document.getElementById('message-input').value = '';
 }
 
+// ЗАГРУЗКА ЧАТОВ
 function loadMyActiveChats() {
     const myChatsRef = ref(db, 'userChats/' + currentUser.uid);
     onValue(myChatsRef, async (snapshot) => {
@@ -273,4 +296,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-            
+        
