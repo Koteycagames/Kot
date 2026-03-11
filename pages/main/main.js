@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { getDatabase, ref, onValue, push, set, serverTimestamp, get, remove } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, set, serverTimestamp, get, remove, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
@@ -20,15 +20,15 @@ const db = getDatabase(app);
 let currentUser = null;
 let currentChatUser = null;
 let unsubscribeMessages = null;
+let activeIncomingCallId = null; // ФИКС: Запоминаем текущий звонок
 
-// ПРОВЕРКА АВТОРИЗАЦИИ
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
         document.getElementById('my-display-name').textContent = user.displayName || "Мой профиль";
         document.getElementById('my-phone-number').textContent = user.phoneNumber;
         loadMyActiveChats();
-        listenForIncomingCalls(); // <-- ЗАПУСКАЕМ СЛУХАЧА ЗВОНКОВ!
+        listenForIncomingCalls(); 
     } else {
         window.location.href = "../login/login.html";
     }
@@ -38,15 +38,12 @@ document.getElementById('logout-btn').onclick = () => signOut(auth);
 
 // --- СИСТЕМА ЗВОНКОВ ---
 
-// ИСХОДЯЩИЙ ЗВОНОК (Кнопка в шапке чата)
 document.getElementById('call-btn').onclick = async () => {
     if (!currentChatUser) return;
     
-    // Генерируем уникальный ID комнаты для звонка
     const roomRef = push(ref(db, 'calls'));
     const roomId = roomRef.key;
 
-    // Записываем информацию о звонке в базу
     await set(roomRef, {
         caller: currentUser.uid,
         receiver: currentChatUser.uid,
@@ -54,13 +51,13 @@ document.getElementById('call-btn').onclick = async () => {
         timestamp: serverTimestamp()
     });
 
-    // Переходим на страницу звонка в режиме "звонящего"
     window.location.href = `../call/call.html?room=${roomId}&mode=caller`;
 };
 
-// ВХОДЯЩИЙ ЗВОНОК (Слушаем базу)
+// ИСПРАВЛЕННЫЙ СЛУХАЧ ЗВОНКОВ
 function listenForIncomingCalls() {
-    const callsRef = ref(db, 'calls');
+    // Слушаем только те звонки, где получатель - МЫ
+    const callsRef = query(ref(db, 'calls'), orderByChild('receiver'), equalTo(currentUser.uid));
     
     onValue(callsRef, async (snapshot) => {
         let incomingCallData = null;
@@ -68,8 +65,7 @@ function listenForIncomingCalls() {
 
         snapshot.forEach(child => {
             const data = child.val();
-            // Ищем звонок, который адресован НАМ и который еще идет
-            if (data.receiver === currentUser.uid && data.status === 'calling') {
+            if (data.status === 'calling') {
                 incomingCallData = data;
                 activeRoomId = child.key;
             }
@@ -78,33 +74,36 @@ function listenForIncomingCalls() {
         const modal = document.getElementById('incoming-call-modal');
         
         if (incomingCallData && activeRoomId) {
-            // Узнаем имя того, кто звонит
+            // ГЛАВНЫЙ ФИКС: Если мы УЖЕ звоним по этому ID, не сбрасываем окно!
+            if (activeIncomingCallId === activeRoomId) return;
+            
+            activeIncomingCallId = activeRoomId; // Записываем, что звонок начался
+            
             const callerSnap = await get(ref(db, 'users/' + incomingCallData.caller));
             const callerName = callerSnap.exists() ? (callerSnap.val().displayName || callerSnap.val().phoneNumber) : "Неизвестный";
             
             document.getElementById('caller-name').textContent = callerName;
             modal.style.display = 'flex';
 
-            // Если мы ПРИНИМАЕМ звонок
             document.getElementById('accept-call-btn').onclick = () => {
+                activeIncomingCallId = null;
                 window.location.href = `../call/call.html?room=${activeRoomId}&mode=receiver`;
             };
 
-            // Если мы СБРАСЫВАЕМ звонок
             document.getElementById('decline-call-btn').onclick = async () => {
                 await remove(ref(db, `calls/${activeRoomId}`));
                 modal.style.display = 'none';
+                activeIncomingCallId = null;
             };
         } else {
-            // Если звонок сбросили с той стороны - прячем модалку
+            // Если звонок сбросили на той стороне
             modal.style.display = 'none';
+            activeIncomingCallId = null;
         }
     });
 }
-
 // --- КОНЕЦ СИСТЕМЫ ЗВОНКОВ ---
 
-// МОДАЛКА НОВОГО ЧАТА И ПОИСК
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -129,7 +128,6 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
         }
 
         let foundUser = null;
-
         snapshot.forEach(child => {
             const userData = child.val();
             const dbDigits = userData.phoneNumber ? userData.phoneNumber.replace(/\D/g, '') : '';
@@ -153,7 +151,6 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
     }
 };
 
-// ОТКРЫТИЕ ЧАТА И КНОПКА НАЗАД
 function openChat(user) {
     currentChatUser = user;
     document.getElementById('no-chat-selected').style.display = 'none';
@@ -167,7 +164,6 @@ document.getElementById('back-to-sidebar-btn').onclick = () => {
     document.getElementById('app-viewport').classList.remove('chat-open');
 };
 
-// ЗАГРУЗКА И ОТПРАВКА СООБЩЕНИЙ
 function loadMessages() {
     if (unsubscribeMessages) unsubscribeMessages();
     const chatId = currentUser.uid < currentChatUser.uid ? 
@@ -218,7 +214,6 @@ function sendMessage(text = '', img = null) {
     document.getElementById('message-input').value = '';
 }
 
-// ЗАГРУЗКА АКТИВНЫХ ЧАТОВ
 function loadMyActiveChats() {
     const myChatsRef = ref(db, 'userChats/' + currentUser.uid);
     onValue(myChatsRef, async (snapshot) => {
@@ -278,4 +273,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-        
+            
