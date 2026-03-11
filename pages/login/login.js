@@ -1,8 +1,13 @@
+// --- СИГНАЛИЗАЦИЯ ДЛЯ ПЛАНШЕТА (ПОКАЖЕТ ОШИБКУ НА ЭКРАНЕ) ---
+window.onerror = function(msg, url, line) {
+    alert("🚨 КРИТИЧЕСКАЯ ОШИБКА JS:\n" + msg + "\nСтрока: " + line);
+    return false;
+};
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
-// --- КОНФИГУРАЦИЯ FIREBASE ---
 const firebaseConfig = {
     apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
     authDomain: "kotogram-9b0b9.firebaseapp.com",
@@ -16,17 +21,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-
 let confirmationResult = null;
 
-// --- ПРОВЕРКА БАНА ПРИ ВХОДЕ ---
+// ПРОВЕРКА БАНА ПРИ ВХОДЕ
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         try {
             const userRef = ref(db, 'users/' + user.uid);
             const userSnap = await get(userRef);
             
-            // Если аккаунт в бане
             if (userSnap.exists() && userSnap.val().banned === true) {
                 alert("🚫 Ваш аккаунт заблокирован администрацией.");
                 await signOut(auth);
@@ -34,7 +37,6 @@ onAuthStateChanged(auth, async (user) => {
                 return;
             }
 
-            // Если новый юзер
             if (!userSnap.exists()) {
                 await set(userRef, {
                     uid: user.uid,
@@ -43,81 +45,78 @@ onAuthStateChanged(auth, async (user) => {
                     banned: false
                 });
             }
-
-            // Пускаем в мессенджер
             window.location.href = "../main/main.html";
-
         } catch (error) {
-            console.error("Ошибка проверки юзера:", error);
+            alert("Ошибка базы данных: " + error.message);
         }
     }
 });
 
-// --- ЖЕЛЕЗОБЕТОННАЯ ОТПРАВКА СМС ---
-document.getElementById('send-code-btn').onclick = async () => {
-    const phoneNumber = document.getElementById('phone-number').value.trim();
-    const errorEl = document.getElementById('login-error');
-    errorEl.textContent = '';
+// ПРОВЕРЯЕМ, СУЩЕСТВУЮТ ЛИ КНОПКИ (чтобы скрипт не падал в тишину)
+const sendBtn = document.getElementById('send-code-btn');
+const verifyBtn = document.getElementById('verify-code-btn');
+const phoneInput = document.getElementById('phone-number');
+const errorEl = document.getElementById('login-error');
 
-    if (!phoneNumber) {
-        errorEl.textContent = "Введите номер телефона!";
-        return;
-    }
+if (!sendBtn) alert("🚨 Ошибка: В HTML нет кнопки с ID 'send-code-btn'!");
+if (!phoneInput) alert("🚨 Ошибка: В HTML нет поля с ID 'phone-number'!");
 
-    const btn = document.getElementById('send-code-btn');
-    btn.disabled = true;
-    btn.textContent = "Загрузка капчи...";
+// БЕЗОПАСНАЯ КАПЧА
+try {
+    const recaptchaDiv = document.createElement('div');
+    recaptchaDiv.id = 'recaptcha-container';
+    document.body.appendChild(recaptchaDiv);
 
-    try {
-        // 1. Чистим старую капчу, если она зависла с прошлого клика
-        if (window.recaptchaVerifier) {
-            window.recaptchaVerifier.clear();
-            window.recaptchaVerifier = null;
-        }
-        const oldDiv = document.getElementById('recaptcha-container');
-        if (oldDiv) oldDiv.remove();
-
-        // 2. Создаем чистый контейнер
-        const recaptchaDiv = document.createElement('div');
-        recaptchaDiv.id = 'recaptcha-container';
-        document.body.appendChild(recaptchaDiv);
-
-        // 3. Инициализируем новую капчу
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            'size': 'invisible'
-        });
-
-        // 4. Пробуем отправить СМС
-        btn.textContent = "Отправка СМС...";
-        confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
-        
-        // 5. Успех! Переходим к вводу кода
-        document.getElementById('step-1').style.display = 'none';
-        document.getElementById('step-2').style.display = 'block';
-
-    } catch (error) {
-        console.error("Firebase Error:", error);
-        // ТЕПЕРЬ МЫ УВИДИМ РЕАЛЬНУЮ ОШИБКУ НА ЭКРАНЕ
-        errorEl.textContent = "Ошибка: " + error.message; 
-        btn.disabled = false;
-        btn.textContent = "Получить код";
-    }
-};
-
-// --- ПРОВЕРКА КОДА ИЗ СМС ---
-document.getElementById('verify-code-btn').onclick = () => {
-    const code = document.getElementById('verification-code').value.trim();
-    const errorEl = document.getElementById('login-error');
-    errorEl.textContent = '';
-
-    if (!code) {
-        errorEl.textContent = "Введите код!";
-        return;
-    }
-
-    confirmationResult.confirm(code).catch((error) => {
-        console.error(error);
-        errorEl.textContent = "Неверный код из СМС!";
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible'
     });
-};
-                                                         
+} catch (e) {
+    alert("🚨 ОШИБКА КАПЧИ ПРИ ЗАГРУЗКЕ:\n" + e.message);
+}
+
+// ОТПРАВКА СМС
+if (sendBtn) {
+    sendBtn.onclick = async () => {
+        try {
+            const phoneNumber = phoneInput.value.trim();
+            if (errorEl) errorEl.textContent = '';
+
+            if (!phoneNumber) {
+                if (errorEl) errorEl.textContent = "Введите номер телефона!";
+                else alert("Введите номер телефона!");
+                return;
+            }
+
+            sendBtn.disabled = true;
+            sendBtn.textContent = "Отправка...";
+
+            confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
+            
+            const step1 = document.getElementById('step-1');
+            const step2 = document.getElementById('step-2');
+            if (step1) step1.style.display = 'none';
+            if (step2) step2.style.display = 'block';
+
+        } catch (error) {
+            alert("🚨 ОШИБКА FIREBASE ПРИ ОТПРАВКЕ:\n" + error.message);
+            sendBtn.disabled = false;
+            sendBtn.textContent = "Получить код";
+        }
+    };
+}
+
+// ПРОВЕРКА КОДА
+if (verifyBtn) {
+    verifyBtn.onclick = () => {
+        const codeInput = document.getElementById('verification-code');
+        if (!codeInput) { alert("🚨 Ошибка: Нет поля 'verification-code'"); return; }
+        
+        const code = codeInput.value.trim();
+        if (!code) return;
+
+        confirmationResult.confirm(code).catch((error) => {
+            if (errorEl) errorEl.textContent = "Неверный код из СМС!";
+            else alert("Неверный код!");
+        });
+    };
+                    }
