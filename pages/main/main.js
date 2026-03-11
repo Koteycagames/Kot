@@ -160,7 +160,6 @@ function loadMessages() {
             const msgKey = child.key;
             const isMine = msg.senderId === currentUser.uid;
 
-            // Меняем статус на "прочитано", только если сообщение чужое и еще не прочитано
             if (!isMine && msg.status !== 'read') {
                 update(ref(db, `chats/${chatId}/messages/${msgKey}`), { status: 'read' });
             }
@@ -168,14 +167,14 @@ function loadMessages() {
             const div = document.createElement('div');
             div.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
             div.style.background = isMine ? '#effdde' : '#fff';
-            div.style.padding = '8px 12px 20px 12px'; // Место под время и галочки
+            div.style.padding = '8px 12px 20px 12px'; 
             div.style.borderRadius = '12px'; 
             div.style.margin = '4px 0';
             div.style.maxWidth = '85%'; 
+            div.style.minWidth = '85px'; // <--- ФИКС ДЛЯ КОРОТКИХ СООБЩЕНИЙ
             div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
             div.style.position = 'relative';
 
-            // Умная обработка времени
             let timeString = '';
             const timeToUse = msg.timestamp || Date.now();
             const date = new Date(timeToUse);
@@ -183,20 +182,18 @@ function loadMessages() {
                 timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
 
-            // Галочки
             let ticksHtml = '';
             if (isMine) {
                 if (msg.status === 'read') {
-                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #4caf50;">done_all</span>`; // Две зеленые
+                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #4caf50;">done_all</span>`; 
                 } else {
-                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #888;">done</span>`; // Одна серая
+                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #888;">done</span>`; 
                 }
             }
 
             if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
             if (msg.text) div.innerHTML += `<span style="word-break: break-word; line-height: 1.4;">${msg.text}</span>`;
             
-            // Блок времени и галочек
             div.innerHTML += `
                 <div style="position: absolute; bottom: 4px; right: 10px; display: flex; align-items: center; gap: 3px; font-size: 11px; color: #8a8a8a;">
                     <span>${timeString}</span>
@@ -293,4 +290,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-                                             
+                
