@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { getDatabase, ref, onValue, push, set, serverTimestamp, get, remove, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+import { getDatabase, ref, onValue, push, set, serverTimestamp, get, remove, query, orderByChild, equalTo, update } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
@@ -26,7 +26,6 @@ let activeIncomingCallId = null;
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
-        // Заполняем профиль в боковом меню!
         document.getElementById('drawer-display-name').textContent = user.displayName || "Мой профиль";
         document.getElementById('drawer-phone-number').textContent = user.phoneNumber;
         
@@ -46,62 +45,44 @@ document.getElementById('burger-menu-btn').onclick = () => {
     drawerOverlay.classList.add('open');
 };
 
-// Закрываем меню по клику на затемненный фон
 drawerOverlay.onclick = () => {
     drawer.classList.remove('open');
     drawerOverlay.classList.remove('open');
 };
 
-// Кнопка Настройки
-document.getElementById('btn-settings').onclick = () => {
-    window.location.href = "../settings/settings.html";
-};
-
-// Кнопка Выхода (переехала в меню)
+document.getElementById('btn-settings').onclick = () => window.location.href = "../settings/settings.html";
 document.getElementById('drawer-logout-btn').onclick = () => signOut(auth);
-
 
 // --- СИСТЕМА ЗВОНКОВ ---
 document.getElementById('call-btn').onclick = async () => {
     if (!currentChatUser) return;
-    
     const roomRef = push(ref(db, 'calls'));
     const roomId = roomRef.key;
-
     await set(roomRef, {
-        caller: currentUser.uid,
-        receiver: currentChatUser.uid,
-        status: 'calling',
-        timestamp: serverTimestamp()
+        caller: currentUser.uid, receiver: currentChatUser.uid,
+        status: 'calling', timestamp: serverTimestamp()
     });
-
     window.location.href = `../call/call.html?room=${roomId}&mode=caller`;
 };
 
 function listenForIncomingCalls() {
     const callsRef = query(ref(db, 'calls'), orderByChild('receiver'), equalTo(currentUser.uid));
-    
     onValue(callsRef, async (snapshot) => {
         let incomingCallData = null;
         let activeRoomId = null;
-
         snapshot.forEach(child => {
             const data = child.val();
             if (data.status === 'calling') {
-                incomingCallData = data;
-                activeRoomId = child.key;
+                incomingCallData = data; activeRoomId = child.key;
             }
         });
 
         const modal = document.getElementById('incoming-call-modal');
-        
         if (incomingCallData && activeRoomId) {
             if (activeIncomingCallId === activeRoomId) return;
             activeIncomingCallId = activeRoomId;
-            
             const callerSnap = await get(ref(db, 'users/' + incomingCallData.caller));
             const callerName = callerSnap.exists() ? (callerSnap.val().displayName || callerSnap.val().phoneNumber) : "Неизвестный";
-            
             document.getElementById('caller-name').textContent = callerName;
             modal.style.display = 'flex';
 
@@ -109,7 +90,6 @@ function listenForIncomingCalls() {
                 activeIncomingCallId = null;
                 window.location.href = `../call/call.html?room=${activeRoomId}&mode=receiver`;
             };
-
             document.getElementById('decline-call-btn').onclick = async () => {
                 await remove(ref(db, `calls/${activeRoomId}`));
                 modal.style.display = 'none';
@@ -135,40 +115,28 @@ document.getElementById('close-new-chat-btn').onclick = () => newChatModal.style
 document.getElementById('start-new-chat-btn').onclick = async () => {
     let rawPhone = document.getElementById('new-chat-phone').value.trim();
     if (!rawPhone) return;
-
     let searchDigits = rawPhone.replace(/\D/g, ''); 
     const errorEl = document.getElementById('new-chat-error');
     errorEl.textContent = "Ищем пользователя...";
 
     try {
         const snapshot = await get(ref(db, 'users'));
-        if (!snapshot.exists()) {
-            errorEl.textContent = "В KotoGram еще нет пользователей!";
-            return;
-        }
-
+        if (!snapshot.exists()) return errorEl.textContent = "В KotoGram еще нет пользователей!";
         let foundUser = null;
         snapshot.forEach(child => {
             const userData = child.val();
             const dbDigits = userData.phoneNumber ? userData.phoneNumber.replace(/\D/g, '') : '';
-            if (dbDigits === searchDigits) {
-                foundUser = userData;
-            }
+            if (dbDigits === searchDigits) foundUser = userData;
         });
 
         if (foundUser) {
-            if (foundUser.uid === currentUser.uid) {
-                errorEl.textContent = "Нельзя создать чат с самим собой!";
-                return;
-            }
+            if (foundUser.uid === currentUser.uid) return errorEl.textContent = "Нельзя создать чат с самим собой!";
             newChatModal.style.display = 'none';
             openChat(foundUser);
         } else {
             errorEl.textContent = "Пользователь не найден. Проверьте номер.";
         }
-    } catch (e) {
-        errorEl.textContent = "Ошибка базы данных.";
-    }
+    } catch (e) { errorEl.textContent = "Ошибка базы данных."; }
 };
 
 // ОТКРЫТИЕ ЧАТА
@@ -181,11 +149,11 @@ function openChat(user) {
     loadMessages();
 }
 
-document.getElementById('back-to-sidebar-btn').onclick = () => {
-    document.getElementById('app-viewport').classList.remove('chat-open');
-};
+document.getElementById('back-to-sidebar-btn').onclick = () => document.getElementById('app-viewport').classList.remove('chat-open');
 
-// СООБЩЕНИЯ
+// ==========================================
+// НОВАЯ СИСТЕМА СООБЩЕНИЙ (ВРЕМЯ И ГАЛОЧКИ)
+// ==========================================
 function loadMessages() {
     if (unsubscribeMessages) unsubscribeMessages();
     const chatId = currentUser.uid < currentChatUser.uid ? 
@@ -195,18 +163,60 @@ function loadMessages() {
     unsubscribeMessages = onValue(ref(db, `chats/${chatId}/messages`), (snap) => {
         const container = document.getElementById('messages-container');
         container.innerHTML = '';
-        snap.forEach(c => {
-            const m = c.val();
-            const d = document.createElement('div');
-            const isMine = m.senderId === currentUser.uid;
-            d.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
-            d.style.background = isMine ? '#effdde' : '#fff';
-            d.style.padding = '10px'; d.style.borderRadius = '12px'; d.style.margin = '4px 0';
-            d.style.maxWidth = '85%'; d.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
+        
+        snap.forEach(child => {
+            const msg = child.val();
+            const msgKey = child.key;
+            const isMine = msg.senderId === currentUser.uid;
 
-            if (m.imageUrl) d.innerHTML += `<img src="${m.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
-            if (m.text) d.innerHTML += `<span style="word-break: break-word;">${m.text}</span>`;
-            container.appendChild(d);
+            // ЕСЛИ СООБЩЕНИЕ НЕ НАШЕ И ОНО НЕ ПРОЧИТАНО -> ПОМЕЧАЕМ КАК ПРОЧИТАННОЕ
+            if (!isMine && msg.status !== 'read') {
+                update(ref(db, `chats/${chatId}/messages/${msgKey}`), { status: 'read' });
+            }
+
+            const div = document.createElement('div');
+            div.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
+            div.style.background = isMine ? '#effdde' : '#fff';
+            // Добавили нижний padding (20px) под время и галочки
+            div.style.padding = '8px 12px 20px 12px'; 
+            div.style.borderRadius = '12px'; 
+            div.style.margin = '4px 0';
+            div.style.maxWidth = '85%'; 
+            div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
+            div.style.position = 'relative'; // Для абсолютного позиционирования времени
+
+            // 1. Обработка времени
+            let timeString = '';
+            if (msg.timestamp) {
+                const date = new Date(msg.timestamp);
+                timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            // 2. Обработка галочек
+            let ticksHtml = '';
+            if (isMine) {
+                if (msg.status === 'read') {
+                    // Две зеленые галочки
+                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #4caf50;">done_all</span>`;
+                } else {
+                    // Одна серая галочка
+                    ticksHtml = `<span class="material-icons" style="font-size: 14px; color: #888;">done</span>`;
+                }
+            }
+
+            // 3. Собираем сообщение
+            if (msg.imageUrl) div.innerHTML += `<img src="${msg.imageUrl}" style="max-width:100%; border-radius:8px; display:block; margin-bottom:5px;">`;
+            if (msg.text) div.innerHTML += `<span style="word-break: break-word; line-height: 1.4;">${msg.text}</span>`;
+            
+            // 4. Добавляем блок метаданных (Время + Галочки) в правый нижний угол
+            div.innerHTML += `
+                <div style="position: absolute; bottom: 4px; right: 10px; display: flex; align-items: center; gap: 3px; font-size: 11px; color: #8a8a8a;">
+                    <span>${timeString}</span>
+                    ${ticksHtml}
+                </div>
+            `;
+            
+            container.appendChild(div);
         });
         container.scrollTop = container.scrollHeight;
     });
@@ -217,6 +227,7 @@ document.getElementById('send-btn').onclick = () => {
     if (text) sendMessage(text);
 };
 
+// ОБНОВЛЕННАЯ ОТПРАВКА СТАТУСА
 function sendMessage(text = '', img = null) {
     if (!currentChatUser) return;
     const myUid = currentUser.uid;
@@ -227,7 +238,8 @@ function sendMessage(text = '', img = null) {
         senderId: myUid,
         text: text,
         imageUrl: img,
-        timestamp: serverTimestamp()
+        timestamp: serverTimestamp(),
+        status: 'sent' // <--- Добавили статус "отправлено"
     });
 
     set(ref(db, `userChats/${myUid}/${otherUid}`), true);
@@ -296,4 +308,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-        
+                                  
