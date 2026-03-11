@@ -21,6 +21,7 @@ let currentUser = null;
 let currentChatUser = null;
 let unsubscribeMessages = null;
 let activeIncomingCallId = null;
+let isMessageSending = false; // Блокировка от двойного клика!
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -51,7 +52,6 @@ drawerOverlay.onclick = () => {
 
 document.getElementById('btn-settings').onclick = () => window.location.href = "../settings/settings.html";
 document.getElementById('drawer-logout-btn').onclick = () => signOut(auth);
-
 
 // --- СИСТЕМА ЗВОНКОВ ---
 document.getElementById('call-btn').onclick = async () => {
@@ -131,13 +131,12 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
         if (foundUser) {
             if (foundUser.uid === currentUser.uid) return errorEl.textContent = "Нельзя создать чат с самим собой!";
             newChatModal.style.display = 'none';
-            openChat(foundUser); // Просто открываем чат. В список он пока НЕ добавляется!
+            openChat(foundUser); 
         } else {
             errorEl.textContent = "Пользователь не найден. Проверьте номер.";
         }
     } catch (e) { errorEl.textContent = "Ошибка базы данных."; }
 };
-
 
 // --- ЛОГИКА ЧАТА ---
 function openChat(user) {
@@ -213,12 +212,31 @@ function loadMessages() {
     });
 }
 
+// --- ОТПРАВКА СООБЩЕНИЯ С ЗАЩИТОЙ ОТ ДЮПОВ ---
 document.getElementById('send-btn').onclick = () => {
-    const text = document.getElementById('message-input').value.trim();
-    if (text) sendMessage(text);
+    if (isMessageSending) return; // Если уже отправляем - игнорируем клик
+    
+    const input = document.getElementById('message-input');
+    const text = input.value.trim();
+    
+    if (text) {
+        isMessageSending = true; // Ставим замок
+        input.value = ''; // Моментально очищаем инпут для визуала
+        sendMessage(text);
+        
+        // Снимаем замок через 500мс (защита от двойного тапа)
+        setTimeout(() => { isMessageSending = false; }, 500);
+    }
 };
 
-// --- ОТПРАВКА СООБЩЕНИЯ И ДОБАВЛЕНИЕ В СПИСОК ЧАТОВ ---
+// БОНУС: Отправка по нажатию Enter (Shift+Enter делает перенос строки)
+document.getElementById('message-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault(); // Останавливаем стандартный перенос строки
+        document.getElementById('send-btn').click(); // Имитируем клик по кнопке
+    }
+});
+
 function sendMessage(text = '', img = null) {
     if (!currentChatUser) return;
     const myUid = currentUser.uid;
@@ -227,7 +245,6 @@ function sendMessage(text = '', img = null) {
     
     const time = serverTimestamp();
     
-    // Формируем текст для предпросмотра в списке чатов
     let snippet = text;
     if (!snippet && img) snippet = '📷 Фото';
 
@@ -239,7 +256,6 @@ function sendMessage(text = '', img = null) {
         status: 'sent'
     });
 
-    // ТОЛЬКО ТЕПЕРЬ чат появляется в боковом меню! Сохраняем время и текст последнего сообщения
     update(ref(db, `userChats/${myUid}/${otherUid}`), {
         timestamp: time,
         lastMessage: snippet
@@ -248,12 +264,10 @@ function sendMessage(text = '', img = null) {
         timestamp: time,
         lastMessage: snippet
     });
-
-    document.getElementById('message-input').value = '';
 }
 
 
-// --- ПРОДВИНУТАЯ ЗАГРУЗКА СПИСКА ЧАТОВ (СТИЛЬ ТЕЛЕГРАМА) ---
+// --- ПРОДВИНУТАЯ ЗАГРУЗКА СПИСКА ЧАТОВ ---
 function loadMyActiveChats() {
     const myChatsRef = ref(db, 'userChats/' + currentUser.uid);
     onValue(myChatsRef, async (snapshot) => {
@@ -267,7 +281,6 @@ function loadMyActiveChats() {
         const chats = [];
         snapshot.forEach(child => {
             const val = child.val();
-            // Защита от старых баз, где было просто true
             const isObj = typeof val === 'object' && val !== null;
             chats.push({
                 uid: child.key,
@@ -276,10 +289,8 @@ function loadMyActiveChats() {
             });
         });
 
-        // Сортируем от новых к старым (новые сообщения сверху)
         chats.sort((a, b) => b.timestamp - a.timestamp);
 
-        // Получаем имена профилей
         const chatPromises = chats.map(c => get(ref(db, 'users/' + c.uid)));
         const usersSnapshots = await Promise.all(chatPromises);
         
@@ -292,7 +303,6 @@ function loadMyActiveChats() {
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 
-                // Время для превью
                 let timeStr = '';
                 if (chatMeta.timestamp) {
                     const d = new Date(chatMeta.timestamp);
@@ -314,7 +324,6 @@ function loadMyActiveChats() {
         });
     });
 }
-
 
 // --- ИЗОБРАЖЕНИЯ ---
 document.getElementById('attach-btn').onclick = () => document.getElementById('image-input').click();
@@ -347,4 +356,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-    
+        
