@@ -35,6 +35,7 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
+// --- ВЫДВИЖНОЕ МЕНЮ ---
 const drawer = document.getElementById('drawer');
 const drawerOverlay = document.getElementById('drawer-overlay');
 
@@ -51,6 +52,8 @@ drawerOverlay.onclick = () => {
 document.getElementById('btn-settings').onclick = () => window.location.href = "../settings/settings.html";
 document.getElementById('drawer-logout-btn').onclick = () => signOut(auth);
 
+
+// --- СИСТЕМА ЗВОНКОВ ---
 document.getElementById('call-btn').onclick = async () => {
     if (!currentChatUser) return;
     const roomRef = push(ref(db, 'calls'));
@@ -99,6 +102,7 @@ function listenForIncomingCalls() {
     });
 }
 
+// --- ПОИСК И НОВЫЙ ЧАТ ---
 const newChatModal = document.getElementById('new-chat-modal');
 document.getElementById('new-chat-btn').onclick = () => {
     newChatModal.style.display = 'flex';
@@ -127,13 +131,15 @@ document.getElementById('start-new-chat-btn').onclick = async () => {
         if (foundUser) {
             if (foundUser.uid === currentUser.uid) return errorEl.textContent = "Нельзя создать чат с самим собой!";
             newChatModal.style.display = 'none';
-            openChat(foundUser);
+            openChat(foundUser); // Просто открываем чат. В список он пока НЕ добавляется!
         } else {
             errorEl.textContent = "Пользователь не найден. Проверьте номер.";
         }
     } catch (e) { errorEl.textContent = "Ошибка базы данных."; }
 };
 
+
+// --- ЛОГИКА ЧАТА ---
 function openChat(user) {
     currentChatUser = user;
     document.getElementById('no-chat-selected').style.display = 'none';
@@ -171,7 +177,7 @@ function loadMessages() {
             div.style.borderRadius = '12px'; 
             div.style.margin = '4px 0';
             div.style.maxWidth = '85%'; 
-            div.style.minWidth = '85px'; // <--- ФИКС ДЛЯ КОРОТКИХ СООБЩЕНИЙ
+            div.style.minWidth = '85px';
             div.style.boxShadow = '0 1px 1px rgba(0,0,0,0.1)';
             div.style.position = 'relative';
 
@@ -212,47 +218,96 @@ document.getElementById('send-btn').onclick = () => {
     if (text) sendMessage(text);
 };
 
+// --- ОТПРАВКА СООБЩЕНИЯ И ДОБАВЛЕНИЕ В СПИСОК ЧАТОВ ---
 function sendMessage(text = '', img = null) {
     if (!currentChatUser) return;
     const myUid = currentUser.uid;
     const otherUid = currentChatUser.uid;
     const chatId = myUid < otherUid ? `${myUid}_${otherUid}` : `${otherUid}_${myUid}`;
+    
+    const time = serverTimestamp();
+    
+    // Формируем текст для предпросмотра в списке чатов
+    let snippet = text;
+    if (!snippet && img) snippet = '📷 Фото';
 
     push(ref(db, `chats/${chatId}/messages`), {
         senderId: myUid,
         text: text,
         imageUrl: img,
-        timestamp: serverTimestamp(),
+        timestamp: time,
         status: 'sent'
     });
 
-    set(ref(db, `userChats/${myUid}/${otherUid}`), true);
-    set(ref(db, `userChats/${otherUid}/${myUid}`), true);
+    // ТОЛЬКО ТЕПЕРЬ чат появляется в боковом меню! Сохраняем время и текст последнего сообщения
+    update(ref(db, `userChats/${myUid}/${otherUid}`), {
+        timestamp: time,
+        lastMessage: snippet
+    });
+    update(ref(db, `userChats/${otherUid}/${myUid}`), {
+        timestamp: time,
+        lastMessage: snippet
+    });
 
     document.getElementById('message-input').value = '';
 }
 
+
+// --- ПРОДВИНУТАЯ ЗАГРУЗКА СПИСКА ЧАТОВ (СТИЛЬ ТЕЛЕГРАМА) ---
 function loadMyActiveChats() {
     const myChatsRef = ref(db, 'userChats/' + currentUser.uid);
     onValue(myChatsRef, async (snapshot) => {
         const list = document.getElementById('chat-list');
-        list.innerHTML = '';
         
         if (!snapshot.exists()) {
-            list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Нажмите на карандаш, чтобы начать общение</div>';
+            list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Нет чатов.<br>Нажмите на карандаш, чтобы начать общение</div>';
             return;
         }
 
-        const chatPromises = [];
-        snapshot.forEach(child => chatPromises.push(get(ref(db, 'users/' + child.key))));
+        const chats = [];
+        snapshot.forEach(child => {
+            const val = child.val();
+            // Защита от старых баз, где было просто true
+            const isObj = typeof val === 'object' && val !== null;
+            chats.push({
+                uid: child.key,
+                timestamp: isObj ? (val.timestamp || 0) : 0,
+                lastMessage: isObj ? (val.lastMessage || 'Сообщение') : 'Чат создан'
+            });
+        });
+
+        // Сортируем от новых к старым (новые сообщения сверху)
+        chats.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Получаем имена профилей
+        const chatPromises = chats.map(c => get(ref(db, 'users/' + c.uid)));
         const usersSnapshots = await Promise.all(chatPromises);
         
-        usersSnapshots.forEach(userSnap => {
+        list.innerHTML = '';
+        
+        chats.forEach((chatMeta, index) => {
+            const userSnap = usersSnapshots[index];
             if (userSnap.exists()) {
                 const u = userSnap.val();
                 const item = document.createElement('div');
                 item.className = 'chat-item';
-                item.innerHTML = `<strong>${u.displayName || 'Контакт'}</strong><br><small>${u.phoneNumber}</small>`;
+                
+                // Время для превью
+                let timeStr = '';
+                if (chatMeta.timestamp) {
+                    const d = new Date(chatMeta.timestamp);
+                    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+
+                item.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                        <strong style="font-size: 16px; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${u.displayName || u.phoneNumber}</strong>
+                        <span style="font-size: 12px; color: #888;">${timeStr}</span>
+                    </div>
+                    <div style="font-size: 14px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${chatMeta.lastMessage}
+                    </div>
+                `;
                 item.onclick = () => openChat(u);
                 list.appendChild(item);
             }
@@ -260,6 +315,8 @@ function loadMyActiveChats() {
     });
 }
 
+
+// --- ИЗОБРАЖЕНИЯ ---
 document.getElementById('attach-btn').onclick = () => document.getElementById('image-input').click();
 document.getElementById('image-input').onchange = (e) => {
     const f = e.target.files[0];
@@ -290,4 +347,4 @@ document.getElementById('send-image-btn').onclick = async () => {
     } catch (e) { alert("Ошибка ImgBB"); }
     b.disabled = false; b.textContent = 'Отправить';
 };
-                
+    
