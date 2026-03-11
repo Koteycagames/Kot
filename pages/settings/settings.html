@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>KotoGram - Настройки</title>
+    <link rel="stylesheet" href="settings.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="settings-container">
+        <header class="settings-header">
+            <button class="icon-btn" id="back-btn">
+                <span class="material-icons">arrow_back</span>
+            </button>
+            <h2>Настройки</h2>
+            <div style="width: 40px;"></div> </header>
+
+        <main class="settings-content">
+            <div class="profile-section">
+                <div class="avatar-large" id="avatar-container">
+                    <span class="material-icons">camera_alt</span>
+                </div>
+                <p class="phone-display" id="user-phone">Загрузка...</p>
+                <p class="info-text">Ваш номер телефона</p>
+            </div>
+
+            <div class="form-section">
+                <div class="input-group">
+                    <label for="display-name">Имя профиля</label>
+                    <input type="text" id="display-name" placeholder="Например: Иван Иванов">
+                </div>
+                
+                <button class="primary-btn" id="save-btn">
+                    <span class="material-icons">save</span>
+                    Сохранить изменения
+                </button>
+            </div>
+            
+            <div class="divider"></div>
+
+            <div class="danger-section">
+                <button class="danger-btn" id="logout-btn">
+                    <span class="material-icons">logout</span>
+                    Выйти из аккаунта
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p>Сохранение...</p>
+    </div>
+
+    <script type="module" src="settings.js"></script>
+</body>
+</html>
