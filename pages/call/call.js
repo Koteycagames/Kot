@@ -27,6 +27,15 @@ const configuration = {
     ]
 };
 
+// --- ЗВУКИ ЗВОНКА ---
+const dialSound = new Audio('https://freesound.org/data/previews/430/430489_2615143-lq.mp3'); 
+dialSound.loop = true; // Гудки зациклены
+dialSound.volume = 0.5;
+
+const hangupSound = new Audio('https://freesound.org/data/previews/218/218884_3797672-lq.mp3'); 
+hangupSound.volume = 0.6;
+// --------------------
+
 let peerConnection = null;
 let localStream = null;
 let remoteStream = null;
@@ -79,7 +88,6 @@ async function initMedia() {
 async function setupWebRTC() {
     peerConnection = new RTCPeerConnection(configuration);
 
-    // Добавляем наши треки
     localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
     });
@@ -93,9 +101,13 @@ async function setupWebRTC() {
         });
     };
 
-    // ФИКС: Мониторинг состояния связи с выводом на экран
+    // Мониторинг состояния связи
     peerConnection.oniceconnectionstatechange = () => {
         if (peerConnection.iceConnectionState === 'connected') {
+            // ТРУБКУ ВЗЯЛИ: Выключаем гудки!
+            dialSound.pause();
+            dialSound.currentTime = 0;
+            
             callStatus.style.opacity = '0'; 
             setTimeout(() => callStatus.style.display = 'none', 500);
         } else if (peerConnection.iceConnectionState === 'disconnected') {
@@ -119,7 +131,6 @@ async function setupWebRTC() {
     listenForHangup();
 }
 
-// Вспомогательная функция: безопасное добавление ICE
 async function addIceCandidateSafely(candidateData) {
     if (peerConnection.remoteDescription) {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidateData));
@@ -138,6 +149,9 @@ function processIceQueue() {
 async function createOffer() {
     statusTitle.textContent = "Вызов...";
     statusSubtitle.textContent = "Ждем ответа собеседника";
+
+    // Включаем длинные гудки ожидания для звонящего!
+    dialSound.play().catch(e => console.log("Браузер заблокировал автовоспроизведение звука", e));
 
     const roomRef = ref(db, `calls/${roomId}`);
     const callerCandidatesRef = ref(db, `calls/${roomId}/callerCandidates`);
@@ -161,7 +175,7 @@ async function createOffer() {
         if (!peerConnection.currentRemoteDescription && data && data.answer) {
             const answer = new RTCSessionDescription(data.answer);
             await peerConnection.setRemoteDescription(answer);
-            processIceQueue(); // Применяем маршруты только после установки связи
+            processIceQueue(); 
         }
     });
 
@@ -196,7 +210,7 @@ async function joinCall() {
         await set(ref(db, `calls/${roomId}/answer`), { type: answer.type, sdp: answer.sdp });
         await set(ref(db, `calls/${roomId}/status`), 'answered');
         
-        processIceQueue(); // Применяем накопленные маршруты
+        processIceQueue(); 
 
         onChildAdded(callerCandidatesRef, snapshot => {
             const data = snapshot.val();
@@ -226,15 +240,33 @@ toggleVideoBtn.onclick = () => {
     }
 };
 
+// --- ФУНКЦИЯ СБРОСА С НОВЫМ ЗВУКОМ ---
 async function hangup() {
+    // Выключаем камеру и микрофон
     if (localStream) localStream.getTracks().forEach(track => track.stop());
     if (remoteStream) remoteStream.getTracks().forEach(track => track.stop());
     if (peerConnection) peerConnection.close();
+    
+    // Выключаем гудки вызова, если они еще играют
+    dialSound.pause();
 
+    // Удаляем комнату из БД
     if (roomId) {
         await remove(ref(db, `calls/${roomId}`));
     }
-    window.location.href = "../main/main.html";
+    
+    // Играем короткие гудки (пип-пип-пип)
+    callStatus.style.display = 'flex';
+    callStatus.style.opacity = '1';
+    statusTitle.textContent = "Звонок завершен";
+    statusSubtitle.textContent = "";
+    
+    hangupSound.play().catch(e => console.log(e));
+
+    // Выходим обратно в мессенджер через 1.5 секунды, чтобы звук успел проиграть
+    setTimeout(() => {
+        window.location.href = "../main/main.html";
+    }, 1500);
 }
 
 hangupBtn.onclick = hangup;
@@ -242,14 +274,10 @@ hangupBtn.onclick = hangup;
 function listenForHangup() {
     onValue(ref(db, `calls/${roomId}`), snapshot => {
         if (!snapshot.exists()) {
-            callStatus.style.display = 'flex';
-            callStatus.style.opacity = '1';
-            statusTitle.textContent = "Звонок завершен";
-            statusSubtitle.textContent = "";
-            setTimeout(() => {
-                window.location.href = "../main/main.html";
-            }, 1000);
+            // Если комнату удалил собеседник, вызываем наш локальный hangup(),
+            // который проиграет звук и выкинет нас в мейн.
+            hangup();
         }
     });
-            }
-            
+                }
+                
