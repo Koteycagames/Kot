@@ -35,7 +35,6 @@ onAuthStateChanged(auth, async (user) => {
             const userRef = ref(db, 'users/' + user.uid);
             const userSnap = await get(userRef);
             
-            // Если аккаунт в бане
             if (userSnap.exists() && userSnap.val().banned === true) {
                 alert("🚫 Ваш аккаунт заблокирован администрацией.");
                 await signOut(auth);
@@ -43,7 +42,6 @@ onAuthStateChanged(auth, async (user) => {
                 return;
             }
 
-            // Если новый юзер
             if (!userSnap.exists()) {
                 await set(userRef, {
                     uid: user.uid,
@@ -53,7 +51,6 @@ onAuthStateChanged(auth, async (user) => {
                 });
             }
 
-            // Пускаем в мессенджер
             window.location.href = "../main/main.html";
 
         } catch (error) {
@@ -67,10 +64,10 @@ function setupRecaptcha() {
     if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
     }
-    // Используем твой div #recaptcha-container
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+    // 🔥 ИСПРАВЛЕННЫЙ ПОРЯДОК: ID контейнера, потом настройки, потом auth 🔥
+    window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
         'size': 'invisible'
-    });
+    }, auth);
 }
 
 // --- ШАГ 1: ОТПРАВКА СМС ---
@@ -91,7 +88,6 @@ sendBtn.onclick = async () => {
         
         confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
         
-        // Успех! Переключаем экраны (используем твои ID: phone-step и code-step)
         phoneStep.style.display = 'none';
         codeStep.style.display = 'block';
         
@@ -132,6 +128,5 @@ backBtn.onclick = () => {
     codeStep.style.display = 'none';
     phoneStep.style.display = 'block';
     if (errorEl) errorEl.textContent = '';
-    codeInput.value = ''; // Очищаем старый код
+    codeInput.value = ''; 
 };
-            
