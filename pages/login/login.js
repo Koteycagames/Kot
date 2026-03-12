@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebas
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
-// --- КОНФИГУРАЦИЯ FIREBASE ---
 const firebaseConfig = {
     apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
     authDomain: "kotogram-9b0b9.firebaseapp.com",
@@ -18,7 +17,6 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 let confirmationResult = null;
 
-// --- ЭЛЕМЕНТЫ ИЗ ТВОЕГО HTML ---
 const phoneStep = document.getElementById('phone-step');
 const codeStep = document.getElementById('code-step');
 const sendBtn = document.getElementById('send-code-btn');
@@ -59,15 +57,25 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- НАСТРОЙКА КАПЧИ ---
+// --- БРОНЕБОЙНАЯ НАСТРОЙКА КАПЧИ ---
 function setupRecaptcha() {
     if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
+        try { window.recaptchaVerifier.clear(); } catch(e) {}
+        window.recaptchaVerifier = null;
     }
-    // 🔥 ИСПРАВЛЕННЫЙ ПОРЯДОК: ID контейнера, потом настройки, потом auth 🔥
-    window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
-        'size': 'invisible'
-    }, auth);
+
+    // Алгоритм-хакер: пробуем оба варианта Гугла по очереди
+    try {
+        // Вариант 1 (по документации)
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
+    } catch (err1) {
+        try {
+            // Вариант 2 (фактический)
+            window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', { 'size': 'invisible' }, auth);
+        } catch (err2) {
+            console.error("Firebase полностью сошел с ума:", err1, err2);
+        }
+    }
 }
 
 // --- ШАГ 1: ОТПРАВКА СМС ---
@@ -130,3 +138,4 @@ backBtn.onclick = () => {
     if (errorEl) errorEl.textContent = '';
     codeInput.value = ''; 
 };
+            
