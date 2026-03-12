@@ -21,6 +21,7 @@
         .input-group input:focus { border-color: #3390ec; }
         .save-btn { width: 100%; padding: 14px; background: #3390ec; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .save-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .fix-btn { width: 100%; padding: 12px; background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 15px; }
         .error-text { color: #e53935; font-size: 13px; text-align: center; margin-top: 10px; min-height: 15px; }
     </style>
 </head>
@@ -60,8 +61,10 @@
         <div id="error-msg" class="error-text"></div>
 
         <button class="save-btn" id="save-btn">Сохранить изменения</button>
+        
+        <button class="fix-btn" id="fix-db-btn">🛠 Починить базу профиля</button>
     </div>
 
-    <script type="module" src="settings.js?v=1001"></script>
+    <script type="module" src="settings.js?v=2000"></script>
 </body>
 </html>
