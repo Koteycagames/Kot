@@ -16,24 +16,24 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// ФИКС: Расширенный список STUN-серверов для пробития роутеров
+// Расширенный список STUN-серверов для пробития роутеров
 const configuration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' } // Мощный резерв
+        { urls: 'stun:global.stun.twilio.com:3478' } 
     ]
 };
 
-// --- ЗВУКИ ЗВОНКА ---
-const dialSound = new Audio('https://freesound.org/data/previews/430/430489_2615143-lq.mp3'); 
-dialSound.loop = true; // Гудки зациклены
+// --- ЗВУКИ ЗВОНКА (НОВЫЕ ВЕЧНЫЕ ССЫЛКИ MIXKIT) ---
+const dialSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3'); 
+dialSound.loop = true; 
 dialSound.volume = 0.5;
 
-const hangupSound = new Audio('https://freesound.org/data/previews/218/218884_3797672-lq.mp3'); 
-hangupSound.volume = 0.6;
+const hangupSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'); 
+hangupSound.volume = 0.7;
 // --------------------
 
 let peerConnection = null;
@@ -42,7 +42,8 @@ let remoteStream = null;
 let roomId = null;
 let mode = null; 
 let currentUser = null;
-let iceCandidatesQueue = []; // Очередь маршрутов
+let iceCandidatesQueue = []; 
+let isDialing = false; // Флаг, чтобы знать, когда выключать гудки
 
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
@@ -101,10 +102,10 @@ async function setupWebRTC() {
         });
     };
 
-    // Мониторинг состояния связи
     peerConnection.oniceconnectionstatechange = () => {
         if (peerConnection.iceConnectionState === 'connected') {
             // ТРУБКУ ВЗЯЛИ: Выключаем гудки!
+            isDialing = false;
             dialSound.pause();
             dialSound.currentTime = 0;
             
@@ -150,8 +151,16 @@ async function createOffer() {
     statusTitle.textContent = "Вызов...";
     statusSubtitle.textContent = "Ждем ответа собеседника";
 
-    // Включаем длинные гудки ожидания для звонящего!
-    dialSound.play().catch(e => console.log("Браузер заблокировал автовоспроизведение звука", e));
+    // --- МАГИЯ АВТОПЛЕЯ ДЛЯ ГУДКОВ ---
+    isDialing = true;
+    dialSound.play().catch(e => {
+        console.log("Браузер заблокировал звук. Включится по первому тапу.");
+        // Хак: ждем любого клика/тапа по экрану, чтобы обойти блокировку
+        document.body.addEventListener('click', function playOnTap() {
+            if (isDialing) dialSound.play().catch(err => {});
+            document.body.removeEventListener('click', playOnTap);
+        }, { once: true });
+    });
 
     const roomRef = ref(db, `calls/${roomId}`);
     const callerCandidatesRef = ref(db, `calls/${roomId}/callerCandidates`);
@@ -240,22 +249,21 @@ toggleVideoBtn.onclick = () => {
     }
 };
 
-// --- ФУНКЦИЯ СБРОСА С НОВЫМ ЗВУКОМ ---
+// --- ФУНКЦИЯ СБРОСА ---
 async function hangup() {
-    // Выключаем камеру и микрофон
     if (localStream) localStream.getTracks().forEach(track => track.stop());
     if (remoteStream) remoteStream.getTracks().forEach(track => track.stop());
     if (peerConnection) peerConnection.close();
-    
-    // Выключаем гудки вызова, если они еще играют
+
+    // Жестко вырубаем гудки
+    isDialing = false;
     dialSound.pause();
 
-    // Удаляем комнату из БД
     if (roomId) {
         await remove(ref(db, `calls/${roomId}`));
     }
     
-    // Играем короткие гудки (пип-пип-пип)
+    // Играем короткий писк сброса
     callStatus.style.display = 'flex';
     callStatus.style.opacity = '1';
     statusTitle.textContent = "Звонок завершен";
@@ -263,7 +271,6 @@ async function hangup() {
     
     hangupSound.play().catch(e => console.log(e));
 
-    // Выходим обратно в мессенджер через 1.5 секунды, чтобы звук успел проиграть
     setTimeout(() => {
         window.location.href = "../main/main.html";
     }, 1500);
@@ -274,10 +281,7 @@ hangupBtn.onclick = hangup;
 function listenForHangup() {
     onValue(ref(db, `calls/${roomId}`), snapshot => {
         if (!snapshot.exists()) {
-            // Если комнату удалил собеседник, вызываем наш локальный hangup(),
-            // который проиграет звук и выкинет нас в мейн.
             hangup();
         }
     });
-                }
-                
+                  }
