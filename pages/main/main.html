@@ -17,12 +17,16 @@
                 </button>
                 <div class="search-container">
                     <span class="material-icons search-icon">search</span>
-                    <input type="text" id="search-input" placeholder="Поиск...">
+                    <input type="text" id="search-input" placeholder="Поиск (@username или номер)">
                 </div>
             </header>
 
             <div class="chat-list" id="chat-list">
                 <div class="info-message">Загрузка...</div>
+            </div>
+            
+            <div class="chat-list" id="search-results-container" style="display: none; background: #f9f9f9;">
+                <div style="padding: 15px; text-align: center; color: #888; font-size: 14px;">Введите запрос...</div>
             </div>
             
             <button class="floating-btn" id="new-chat-btn">
@@ -40,6 +44,8 @@
                     <button class="icon-btn back-btn" id="back-to-sidebar-btn">
                         <span class="material-icons">arrow_back</span>
                     </button>
+                    <img id="current-chat-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px; display: none;">
+                    
                     <div class="chat-info" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
                         <h3 id="current-chat-name" style="margin: 0; line-height: 1.2;">Чат</h3>
                         <span id="current-chat-status" style="font-size: 13px; color: var(--text-secondary); min-height: 16px;"></span>
@@ -84,6 +90,40 @@
                 <div id="new-chat-error" class="error-text"></div>
             </div>
         </div>
+
+        <div class="modal-overlay" id="profile-modal" style="display: none;">
+            <div class="modal-content" style="text-align: center;">
+                <h3 style="margin-bottom: 15px;">Мой профиль</h3>
+                
+                <div class="profile-avatar-wrapper" id="profile-avatar-wrapper" style="position:relative; width: 100px; height: 100px; margin: 0 auto; cursor: pointer;">
+                    <img id="profile-avatar-preview" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
+                    <div style="position: absolute; bottom: 0; right: 0; background: var(--primary-color); color: white; border-radius: 50%; padding: 6px; display: flex; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                        <span class="material-icons" style="font-size: 18px;">camera_alt</span>
+                    </div>
+                </div>
+                <input type="file" id="profile-avatar-input" accept="image/*" style="display: none;">
+                
+                <div style="text-align: left; margin-top: 20px;">
+                    <label style="font-size: 12px; color: #888; margin-left: 5px;">Имя</label>
+                    <input type="text" id="profile-name-input" placeholder="Как вас зовут?">
+                </div>
+                <div style="text-align: left; margin-top: 10px;">
+                    <label style="font-size: 12px; color: #888; margin-left: 5px;">@Username (для поиска)</label>
+                    <input type="text" id="profile-username-input" placeholder="@koteyca">
+                </div>
+                <div style="text-align: left; margin-top: 10px;">
+                    <label style="font-size: 12px; color: #888; margin-left: 5px;">О себе</label>
+                    <input type="text" id="profile-bio-input" placeholder="Сплю на клавиатуре...">
+                </div>
+                
+                <div id="profile-error" class="error-text" style="color: red; font-size: 13px; margin-top: 10px; min-height: 15px;"></div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn" id="close-profile-btn" style="flex: 1; background: #f0f0f0; color: #333;">Отмена</button>
+                    <button class="btn primary-btn" id="save-profile-btn" style="flex: 1;">Сохранить</button>
+                </div>
+            </div>
+        </div>
         
         <div class="modal-overlay" id="image-preview-modal" style="display: none;">
             <div class="modal-content">
@@ -95,9 +135,7 @@
 
         <div class="modal-overlay" id="incoming-call-modal" style="display: none; z-index: 2000; background: rgba(0,0,0,0.85);">
             <div class="modal-content" style="text-align: center; background: #222; color: white; border: 1px solid #333;">
-                <div class="avatar-placeholder" style="width: 80px; height: 80px; margin: 0 auto 15px auto; background: var(--primary-color);">
-                    <span class="material-icons" style="font-size: 40px;">person</span>
-                </div>
+                <img id="caller-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 80px; height: 80px; margin: 0 auto 15px auto; border-radius: 50%; object-fit: cover;">
                 <h3 style="margin-bottom: 5px; font-weight: normal; color: #aaa;">Входящий звонок</h3>
                 <h2 id="caller-name" style="margin-bottom: 30px; font-size: 24px;">Имя звонящего</h2>
                 
@@ -115,18 +153,17 @@
         <div class="drawer-overlay" id="drawer-overlay"></div>
         <div class="drawer" id="drawer">
             <div class="drawer-header">
-                <div class="avatar-placeholder" style="width: 60px; height: 60px; margin-bottom: 10px;">
-                    <span class="material-icons" style="font-size: 32px;">person</span>
-                </div>
+                <img id="drawer-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 65px; height: 65px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 2px solid white;">
                 <div class="drawer-user-info">
                     <h3 id="drawer-display-name">Загрузка...</h3>
                     <p id="drawer-phone-number">+00000000000</p>
+                    <p id="drawer-username" style="font-size: 13px; color: #e3f2fd; margin-top: 3px;"></p>
                 </div>
             </div>
             <div class="drawer-menu">
                 <button class="drawer-item" id="btn-settings">
-                    <span class="material-icons">settings</span>
-                    Настройки
+                    <span class="material-icons">account_circle</span>
+                    Мой профиль
                 </button>
                 <div style="height: 1px; background: #eee; margin: 10px 0;"></div>
                 <button class="drawer-item drawer-item-danger" id="drawer-logout-btn">
@@ -137,14 +174,6 @@
         </div>
     </div>
 
-    <style>
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-            70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-        }
-    </style>
-
-    <script type="module" src="main.js"></script>
+    <script type="module" src="main.js?v=9100"></script>
 </body>
 </html>
