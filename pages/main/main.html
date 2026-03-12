@@ -47,9 +47,14 @@
                     <img id="current-chat-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px; display: none;">
                     
                     <div class="chat-info" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-                        <h3 id="current-chat-name" style="margin: 0; line-height: 1.2;">Чат</h3>
+                        <h3 id="current-chat-name" style="margin: 0; line-height: 1.2; display: flex; align-items: center; gap: 5px;">Чат</h3>
                         <span id="current-chat-status" style="font-size: 13px; color: var(--text-secondary); min-height: 16px;"></span>
                     </div>
+                    
+                    <button class="icon-btn" id="group-manage-btn" style="display: none; color: #333; margin-right: 10px;">
+                        <span class="material-icons">admin_panel_settings</span>
+                    </button>
+                    
                     <button class="icon-btn" id="call-btn" style="color: var(--primary-color);">
                         <span class="material-icons">call</span>
                     </button>
@@ -81,20 +86,9 @@
             </div>
         </main>
         
-        <div class="modal-overlay" id="new-chat-modal" style="display: none;">
-            <div class="modal-content">
-                <h3>Написать по номеру</h3>
-                <input type="tel" id="new-chat-phone" placeholder="+79991234567">
-                <button class="btn primary-btn" id="start-new-chat-btn">Найти и написать</button>
-                <button class="btn" id="close-new-chat-btn">Отмена</button>
-                <div id="new-chat-error" class="error-text"></div>
-            </div>
-        </div>
-
         <div class="modal-overlay" id="profile-modal" style="display: none;">
             <div class="modal-content" style="text-align: center;">
                 <h3 style="margin-bottom: 15px;">Мой профиль</h3>
-                
                 <div class="profile-avatar-wrapper" id="profile-avatar-wrapper" style="position:relative; width: 100px; height: 100px; margin: 0 auto; cursor: pointer;">
                     <img id="profile-avatar-preview" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
                     <div style="position: absolute; bottom: 0; right: 0; background: var(--primary-color); color: white; border-radius: 50%; padding: 6px; display: flex; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
@@ -102,7 +96,6 @@
                     </div>
                 </div>
                 <input type="file" id="profile-avatar-input" accept="image/*" style="display: none;">
-                
                 <div style="text-align: left; margin-top: 20px;">
                     <label style="font-size: 12px; color: #888; margin-left: 5px;">Имя</label>
                     <input type="text" id="profile-name-input" placeholder="Как вас зовут?">
@@ -111,17 +104,53 @@
                     <label style="font-size: 12px; color: #888; margin-left: 5px;">@Username (для поиска)</label>
                     <input type="text" id="profile-username-input" placeholder="@koteyca">
                 </div>
-                <div style="text-align: left; margin-top: 10px;">
-                    <label style="font-size: 12px; color: #888; margin-left: 5px;">О себе</label>
-                    <input type="text" id="profile-bio-input" placeholder="Сплю на клавиатуре...">
-                </div>
-                
                 <div id="profile-error" class="error-text" style="color: red; font-size: 13px; margin-top: 10px; min-height: 15px;"></div>
-                
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                     <button class="btn" id="close-profile-btn" style="flex: 1; background: #f0f0f0; color: #333;">Отмена</button>
                     <button class="btn primary-btn" id="save-profile-btn" style="flex: 1;">Сохранить</button>
                 </div>
+            </div>
+        </div>
+        
+        <div class="modal-overlay" id="create-group-modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Создать новую группу</h3>
+                <input type="text" id="new-group-name" placeholder="Название группы..." style="margin-top: 10px;">
+                <div id="create-group-error" class="error-text" style="color: red; font-size: 13px; margin-top: 5px; min-height: 15px;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn" id="close-create-group-btn" style="flex: 1; background: #f0f0f0; color: #333;">Отмена</button>
+                    <button class="btn primary-btn" id="confirm-create-group-btn" style="flex: 1;">Создать</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="group-manage-modal" style="display: none;">
+            <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
+                <h3 style="margin-bottom: 10px;">Настройки группы</h3>
+                
+                <div id="group-edit-info-section" style="display: none; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <label style="font-size: 13px; color: #777;">Изменить название:</label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="edit-group-name-input" placeholder="Новое название">
+                        <button class="btn primary-btn" id="save-group-name-btn"><span class="material-icons">check</span></button>
+                    </div>
+                </div>
+
+                <div id="group-add-member-section" style="display: none; flex-direction: column; gap: 10px; margin-bottom: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                    <label style="font-size: 13px; color: #777;">Добавить по номеру или @username:</label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="add-member-input" placeholder="@username">
+                        <button class="btn primary-btn" id="add-member-btn"><span class="material-icons">person_add</span></button>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid #eee; padding-top: 15px;">
+                    <h4 style="margin-bottom: 10px;">Участники:</h4>
+                    <div id="group-members-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        </div>
+                </div>
+
+                <button class="btn" id="close-manage-group-btn" style="margin-top: 20px; background: #f0f0f0; color: #333;">Закрыть</button>
             </div>
         </div>
         
@@ -130,23 +159,6 @@
                 <img id="preview-image" src="" style="max-height: 50vh; object-fit: contain;">
                 <button class="btn primary-btn" id="send-image-btn">Отправить фото</button>
                 <button class="btn" id="close-preview-btn">Закрыть</button>
-            </div>
-        </div>
-
-        <div class="modal-overlay" id="incoming-call-modal" style="display: none; z-index: 2000; background: rgba(0,0,0,0.85);">
-            <div class="modal-content" style="text-align: center; background: #222; color: white; border: 1px solid #333;">
-                <img id="caller-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 80px; height: 80px; margin: 0 auto 15px auto; border-radius: 50%; object-fit: cover;">
-                <h3 style="margin-bottom: 5px; font-weight: normal; color: #aaa;">Входящий звонок</h3>
-                <h2 id="caller-name" style="margin-bottom: 30px; font-size: 24px;">Имя звонящего</h2>
-                
-                <div style="display: flex; justify-content: space-around; gap: 20px;">
-                    <button class="control-btn hangup" id="decline-call-btn" style="width: 60px; height: 60px; border-radius: 50%; border: none; background: #e53935; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <span class="material-icons" style="font-size: 28px;">call_end</span>
-                    </button>
-                    <button class="control-btn accept" id="accept-call-btn" style="width: 60px; height: 60px; border-radius: 50%; border: none; background: #4caf50; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; animation: pulse 1.5s infinite;">
-                        <span class="material-icons" style="font-size: 28px;">call</span>
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -165,6 +177,11 @@
                     <span class="material-icons">account_circle</span>
                     Мой профиль
                 </button>
+                <button class="drawer-item" id="btn-open-create-group">
+                    <span class="material-icons">group_add</span>
+                    Создать группу
+                </button>
+                
                 <div style="height: 1px; background: #eee; margin: 10px 0;"></div>
                 <button class="drawer-item drawer-item-danger" id="drawer-logout-btn">
                     <span class="material-icons">logout</span>
@@ -174,6 +191,6 @@
         </div>
     </div>
 
-    <script type="module" src="main.js?v=9100"></script>
+    <script type="module" src="main.js?v=9300"></script>
 </body>
 </html>
