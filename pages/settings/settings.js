@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
 const firebaseConfig = {
@@ -12,97 +12,127 @@ const firebaseConfig = {
     appId: "1:755607509917:web:29b1b85eea516bde702d74"
 };
 
+const IMGBB_API_KEY = "706ffb03d5653cdf91990abac2ce7a29";
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
 let currentUser = null;
+let newAvatarFile = null;
 
-const backBtn = document.getElementById('back-btn');
-const logoutBtn = document.getElementById('logout-btn');
+const nameInput = document.getElementById('name-input');
+const usernameInput = document.getElementById('username-input');
+const bioInput = document.getElementById('bio-input');
+const avatarPreview = document.getElementById('avatar-preview');
 const saveBtn = document.getElementById('save-btn');
-const fixAccountBtn = document.getElementById('fix-account-btn'); // Новая кнопка
-const nameInput = document.getElementById('display-name');
-const phoneDisplay = document.getElementById('user-phone');
-const loadingOverlay = document.getElementById('loading-overlay');
+const errorMsg = document.getElementById('error-msg');
 
+// Проверка авторизации и загрузка текущих данных
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
-        phoneDisplay.textContent = user.phoneNumber;
-        
-        const userRef = ref(db, 'users/' + user.uid);
         try {
-            const snapshot = await get(userRef);
+            const snapshot = await get(ref(db, 'users/' + user.uid));
             if (snapshot.exists()) {
-                const userData = snapshot.val();
-                nameInput.value = userData.displayName || "";
+                const data = snapshot.val();
+                nameInput.value = data.displayName || '';
+                usernameInput.value = data.username || '';
+                bioInput.value = data.bio || '';
+                avatarPreview.src = data.photoURL || 'https://via.placeholder.com/150/cccccc/ffffff?text=?';
             }
-        } catch (e) { console.error(e); }
+        } catch (error) {
+            console.error("Ошибка загрузки профиля:", error);
+            errorMsg.textContent = "Не удалось загрузить данные.";
+        }
     } else {
         window.location.href = "../login/login.html";
     }
 });
 
-backBtn.onclick = () => window.location.href = "../main/main.html";
-logoutBtn.onclick = () => signOut(auth);
+// Кнопка НАЗАД
+document.getElementById('back-btn').onclick = () => {
+    window.location.href = "../main/main.html";
+};
 
-// --- СОХРАНЕНИЕ ИМЕНИ ---
-saveBtn.onclick = async () => {
-    const newName = nameInput.value.trim();
-    if (!newName) return alert("Имя не может быть пустым!");
+// Выбор новой аватарки
+document.getElementById('avatar-wrapper').onclick = () => {
+    document.getElementById('avatar-input').click();
+};
 
-    loadingOverlay.style.display = 'flex';
-    try {
-        await updateProfile(currentUser, { displayName: newName });
-        await update(ref(db, 'users/' + currentUser.uid), { displayName: newName });
-        
-        loadingOverlay.style.display = 'none';
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<span class="material-icons">check</span> Сохранено!';
-        saveBtn.style.background = '#4caf50';
-        setTimeout(() => {
-            saveBtn.innerHTML = originalText;
-            saveBtn.style.background = '';
-        }, 2000);
-    } catch (error) {
-        loadingOverlay.style.display = 'none';
-        alert("Ошибка: " + error.message);
+document.getElementById('avatar-input').onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        newAvatarFile = file;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            avatarPreview.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
     }
 };
 
-// --- ФУНКЦИЯ "ПОЧИНИТЬ АККАУНТ" ---
-fixAccountBtn.onclick = async () => {
-    if (!currentUser) return;
+// СОХРАНЕНИЕ ВСЕХ ПОЛЕЙ
+saveBtn.onclick = async () => {
+    errorMsg.textContent = '';
+    errorMsg.style.color = '#e53935';
     
-    loadingOverlay.style.display = 'flex';
-    try {
-        const userRef = ref(db, 'users/' + currentUser.uid);
-        const snap = await get(userRef);
-        const data = snap.exists() ? snap.val() : {};
-        
-        let updates = {};
-        
-        // Проверяем, чего не хватает, и собираем это в объект updates
-        if (!data.uid) updates.uid = currentUser.uid;
-        if (!data.phoneNumber) updates.phoneNumber = currentUser.phoneNumber;
-        if (!data.displayName) updates.displayName = currentUser.displayName || "Без имени";
-        
-        // В будущем, если добавим аватарки, сюда можно дописать:
-        // if (!data.photoUrl) updates.photoUrl = "default_avatar_url";
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Сохранение...';
 
-        // Если нашли что чинить - чиним
-        if (Object.keys(updates).length > 0) {
-            await update(userRef, updates);
-            loadingOverlay.style.display = 'none';
-            alert("✅ Аккаунт починен! Добавлены недостающие поля:\n" + Object.keys(updates).join(', '));
-        } else {
-            loadingOverlay.style.display = 'none';
-            alert("✨ С аккаунтом всё в полном порядке, чинить нечего!");
+    try {
+        let photoURL = avatarPreview.src;
+
+        // Если выбрали новую фотку, грузим её на ImgBB
+        if (newAvatarFile) {
+            const fd = new FormData();
+            fd.append('image', newAvatarFile);
+            
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                method: 'POST',
+                body: fd
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                photoURL = data.data.url;
+            } else {
+                throw new Error("Ошибка загрузки фото");
+            }
         }
+
+        // Чистим юзернейм (добавляем @ если его нет, но текст есть)
+        let cleanUsername = usernameInput.value.trim();
+        if (cleanUsername && !cleanUsername.startsWith('@')) {
+            cleanUsername = '@' + cleanUsername;
+        }
+
+        // ЖЕЛЕЗОБЕТОННОЕ ОБНОВЛЕНИЕ БАЗЫ ДАННЫХ
+        // Создаем или обновляем абсолютно все нужные поля
+        const updates = {
+            displayName: nameInput.value.trim(),
+            username: cleanUsername,
+            bio: bioInput.value.trim(),
+            photoURL: photoURL.startsWith('data:') ? null : photoURL // защита от багов base64
+        };
+
+        await update(ref(db, 'users/' + currentUser.uid), updates);
+
+        // Успех!
+        errorMsg.style.color = '#4caf50';
+        errorMsg.textContent = 'Настройки успешно сохранены!';
+        newAvatarFile = null;
         
+        setTimeout(() => {
+            window.location.href = "../main/main.html";
+        }, 1000);
+
     } catch (error) {
-        loadingOverlay.style.display = 'none';
-        alert("Ошибка при починке: " + error.message);
+        console.error(error);
+        errorMsg.style.color = '#e53935';
+        errorMsg.textContent = 'Ошибка при сохранении: ' + error.message;
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Сохранить изменения';
     }
 };
