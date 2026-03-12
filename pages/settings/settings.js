@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+import { getDatabase, ref, get, update, set } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
@@ -26,9 +26,9 @@ const usernameInput = document.getElementById('username-input');
 const bioInput = document.getElementById('bio-input');
 const avatarPreview = document.getElementById('avatar-preview');
 const saveBtn = document.getElementById('save-btn');
+const fixBtn = document.getElementById('fix-db-btn');
 const errorMsg = document.getElementById('error-msg');
 
-// Проверка авторизации и загрузка текущих данных
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
@@ -43,19 +43,17 @@ onAuthStateChanged(auth, async (user) => {
             }
         } catch (error) {
             console.error("Ошибка загрузки профиля:", error);
-            errorMsg.textContent = "Не удалось загрузить данные.";
+            errorMsg.textContent = "Не удалось загрузить данные. Нажмите 'Починить базу'.";
         }
     } else {
         window.location.href = "../login/login.html";
     }
 });
 
-// Кнопка НАЗАД
 document.getElementById('back-btn').onclick = () => {
     window.location.href = "../main/main.html";
 };
 
-// Выбор новой аватарки
 document.getElementById('avatar-wrapper').onclick = () => {
     document.getElementById('avatar-input').click();
 };
@@ -72,18 +70,16 @@ document.getElementById('avatar-input').onchange = (e) => {
     }
 };
 
-// СОХРАНЕНИЕ ВСЕХ ПОЛЕЙ
+// --- СТАНДАРТНОЕ СОХРАНЕНИЕ ---
 saveBtn.onclick = async () => {
     errorMsg.textContent = '';
     errorMsg.style.color = '#e53935';
-    
     saveBtn.disabled = true;
     saveBtn.textContent = 'Сохранение...';
 
     try {
         let photoURL = avatarPreview.src;
 
-        // Если выбрали новую фотку, грузим её на ImgBB
         if (newAvatarFile) {
             const fd = new FormData();
             fd.append('image', newAvatarFile);
@@ -101,24 +97,20 @@ saveBtn.onclick = async () => {
             }
         }
 
-        // Чистим юзернейм (добавляем @ если его нет, но текст есть)
         let cleanUsername = usernameInput.value.trim();
         if (cleanUsername && !cleanUsername.startsWith('@')) {
             cleanUsername = '@' + cleanUsername;
         }
 
-        // ЖЕЛЕЗОБЕТОННОЕ ОБНОВЛЕНИЕ БАЗЫ ДАННЫХ
-        // Создаем или обновляем абсолютно все нужные поля
         const updates = {
             displayName: nameInput.value.trim(),
             username: cleanUsername,
             bio: bioInput.value.trim(),
-            photoURL: photoURL.startsWith('data:') ? null : photoURL // защита от багов base64
+            photoURL: photoURL.startsWith('data:') ? null : photoURL
         };
 
         await update(ref(db, 'users/' + currentUser.uid), updates);
 
-        // Успех!
         errorMsg.style.color = '#4caf50';
         errorMsg.textContent = 'Настройки успешно сохранены!';
         newAvatarFile = null;
@@ -130,9 +122,51 @@ saveBtn.onclick = async () => {
     } catch (error) {
         console.error(error);
         errorMsg.style.color = '#e53935';
-        errorMsg.textContent = 'Ошибка при сохранении: ' + error.message;
+        errorMsg.textContent = 'Ошибка сохранения: ' + error.message;
     } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = 'Сохранить изменения';
+    }
+};
+
+// --- 🛠 КНОПКА ПОЧИНКИ БАЗЫ ДАННЫХ 🛠 ---
+fixBtn.onclick = async () => {
+    if (!currentUser) return;
+    
+    const confirmFix = confirm("Это принудительно создаст все недостающие поля в вашей карточке базы данных. Продолжить?");
+    if (!confirmFix) return;
+
+    fixBtn.disabled = true;
+    fixBtn.textContent = "Чиню базу...";
+
+    try {
+        let cleanUsername = usernameInput.value.trim();
+        if (cleanUsername && !cleanUsername.startsWith('@')) {
+            cleanUsername = '@' + cleanUsername;
+        }
+
+        // Используем SET вместо UPDATE, чтобы жестко перезаписать узел профиля
+        // merge: true оставит старые поля (типа phoneNumber), но добавит новые
+        await set(ref(db, 'users/' + currentUser.uid), {
+            uid: currentUser.uid,
+            phoneNumber: currentUser.phoneNumber || "", // Номер телефона сохраняем
+            displayName: nameInput.value.trim() || "Новый пользователь",
+            username: cleanUsername || "",
+            bio: bioInput.value.trim() || "",
+            photoURL: avatarPreview.src.startsWith('data:') ? null : avatarPreview.src,
+            banned: false,   // Снимаем бан, если он забагался
+            warnings: 0      // Сбрасываем страйки
+        });
+
+        alert("✅ База профиля успешно восстановлена! Все поля на месте.");
+        errorMsg.style.color = '#4caf50';
+        errorMsg.textContent = "База починена. Теперь можно сохранять.";
+
+    } catch (error) {
+        console.error(error);
+        alert("🚨 Ошибка при починке базы: " + error.message);
+    } finally {
+        fixBtn.disabled = false;
+        fixBtn.textContent = "🛠 Починить базу профиля";
     }
 };
