@@ -324,3 +324,65 @@ body, html {
     70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
 }
+/* НОВЫЕ СТИЛИ ДЛЯ УПРАВЛЕНИЯ ГРУППАМИ */
+.member-card {
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fafafa;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.member-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.role-select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background: white;
+    font-size: 14px;
+    outline: none;
+}
+.role-select:focus {
+    border-color: var(--primary-color);
+}
+.permissions-box {
+    margin-top: 5px;
+    padding: 10px;
+    background: white;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.perm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #444;
+}
+/* Стилизация чекбоксов */
+.perm-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+.kick-btn {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 5px;
+}
