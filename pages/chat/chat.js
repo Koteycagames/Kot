@@ -1,171 +1,80 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getDatabase, ref, push, set, onChildAdded, get } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+import{initializeApp}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";import{getDatabase,ref,onValue,push,set,serverTimestamp,get,remove,update}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",
-  authDomain: "kotogram-9b0b9.firebaseapp.com",
-  databaseURL: "https://kotogram-9b0b9-default-rtdb.firebaseio.com",
-  projectId: "kotogram-9b0b9",
-  storageBucket: "kotogram-9b0b9.firebasestorage.app",
-  messagingSenderId: "755607509917",
-  appId: "1:755607509917:web:29b1b85eea516bde702d74"
-};
+const firebaseConfig={apiKey:"AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",authDomain:"kotogram-9b0b9.firebaseapp.com",databaseURL:"https://kotogram-9b0b9-default-rtdb.firebaseio.com",projectId:"kotogram-9b0b9",storageBucket:"kotogram-9b0b9.firebasestorage.app",messagingSenderId:"755607509917",appId:"1:755607509917:web:29b1b85eea516bde702d74"};
+const IMGBB_API_KEY="706ffb03d5653cdf91990abac2ce7a29",app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
+const GROQ_API="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";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+const urlParams=new URLSearchParams(window.location.search);
+const chatType=urlParams.get('type');
+const targetId=urlParams.get('id');
 
-const IMGBB_API_KEY = "706ffb03d5653cdf91990abac2ce7a29";
+let cUser=null,cId=null,unsubMsgs=null,unsubGrp=null,unsubStat=null,isMsgSending=!1,replyMsg=null;
+let cGrpInfo={},cGrpMembers={},cGrpPerms={},myRole='member';
 
-// Элементы
-const backBtn = document.getElementById('back-btn');
-const messageInput = document.getElementById('message-input');
-const sendBtn = document.getElementById('send-btn');
-const chatMessages = document.getElementById('chat-messages');
-const attachBtn = document.getElementById('attach-btn');
-const imageInput = document.getElementById('image-input');
+if(!chatType||!targetId){alert("Ошибка загрузки чата!");window.location.href="../../main/main.html";}
 
-let currentUser = null;
-let currentUserName = "Пользователь";
+// ИИ Фильтр
+async function checkMsg(t){if(!t)return!0;try{const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${GROQ_API}`,'Content-Type':'application/json'},body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"system",content:"Ты модератор. Банить ТОЛЬКО за мат и прямой хейт. Имена Лысук, Лыска, Кошарик, Кот — святые, это НЕ мат. Ответь BAN или CLEAN."},{role:"user",content:t}],temperature:0,max_tokens:10})}),d=await r.json();if(!r.ok||!d.choices)return!0;return!d.choices[0].message.content.trim().toUpperCase().includes('BAN')}catch(e){return!0}}
 
-// Ссылка на общую комнату чата в базе
-const messagesRef = ref(db, 'chats/global_room/messages');
+// Контекстное меню
+const ctxMenu=document.createElement('div');ctxMenu.style.cssText=`position:fixed;display:none;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);z-index:3000;flex-direction:column;min-width:180px;border:1px solid #eaeaea;`;document.body.appendChild(ctxMenu);
+document.addEventListener('click',()=>ctxMenu.style.display='none');
 
-// Возврат на главную
-backBtn.addEventListener('click', () => {
-    window.location.href = '../main/main.html';
-});
+function showCtx(x,y,k,m,isM){ctxMenu.innerHTML='';if(m.isDeleted||m.isSystem)return;
+const rr=document.createElement('div');rr.style.cssText='display:flex;justify-content:space-around;padding:12px 10px;border-bottom:1px solid #f0f0f0;background:#fafafa;';
+['👍','❤️','😂','😲','😢','🙏'].forEach(e=>{const s=document.createElement('span');s.textContent=e;let isSel=(m.reactions&&m.reactions[cUser.uid]===e);s.style.cssText='font-size:22px;cursor:pointer;transition:transform 0.1s;padding:2px;border-radius:50%;'+(isSel?'background:#dcedc8;':'');s.onmouseover=()=>s.style.transform='scale(1.2)';s.onmouseout=()=>s.style.transform='scale(1)';s.onclick=()=>{const rR=ref(db,`chats/${cId}/messages/${k}/reactions/${cUser.uid}`);if(isSel)remove(rR);else set(rR,e);ctxMenu.style.display='none';};rr.appendChild(s);});ctxMenu.appendChild(rr);
+const rb=document.createElement('div');rb.innerHTML='<span class="material-icons" style="font-size:18px;margin-right:10px;color:#555;">reply</span> Ответить';rb.style.cssText='padding:12px 15px;display:flex;align-items:center;cursor:pointer;color:#333;font-size:15px;border-bottom:1px solid #f0f0f0;';rb.onmouseover=()=>rb.style.background='#f5f5f5';rb.onmouseout=()=>rb.style.background='white';rb.onclick=()=>{setupReply(k,m,isM?(cUser.displayName||'Вы'):(m.sName||'Пользователь'));ctxMenu.style.display='none';};ctxMenu.appendChild(rb);
+if(isM&&!m.imageUrl){const eb=document.createElement('div');eb.innerHTML='<span class="material-icons" style="font-size:18px;margin-right:10px;color:#555;">edit</span> Изменить';eb.style.cssText='padding:12px 15px;display:flex;align-items:center;cursor:pointer;color:#333;font-size:15px;border-bottom:1px solid #f0f0f0;';eb.onmouseover=()=>eb.style.background='#f5f5f5';eb.onmouseout=()=>eb.style.background='white';eb.onclick=async()=>{const nt=prompt("Редактировать:",m.text);if(nt!==null&&nt.trim()!==""&&nt!==m.text){const isC=await checkMsg(nt.trim());if(!isC){alert("Фильтр: мат запрещен");return;}update(ref(db,`chats/${cId}/messages/${k}`),{text:nt.trim(),isEdited:!0,editTime:serverTimestamp()});if(chatType==='private'){update(ref(db,`userChats/${cUser.uid}/${targetId}`),{lastMessage:nt.trim()});update(ref(db,`userChats/${targetId}/${cUser.uid}`),{lastMessage:nt.trim()});}else{Object.keys(cGrpMembers).forEach(uid=>update(ref(db,`userChats/${uid}/${targetId}`),{lastMessage:nt.trim()}));}}};ctxMenu.appendChild(eb);}
+let canDel=isM;if(chatType==='group'&&!isM){if(myRole==='creator')canDel=!0;if(myRole==='admin'&&cGrpPerms[cUser.uid]?.deleteMsgs)canDel=!0;}
+if(canDel){const dbn=document.createElement('div');dbn.innerHTML='<span class="material-icons" style="font-size:18px;margin-right:10px;color:#e53935;">delete</span> Удалить';dbn.style.cssText='padding:12px 15px;display:flex;align-items:center;cursor:pointer;color:#e53935;font-size:15px;';dbn.onmouseover=()=>dbn.style.background='#ffebee';dbn.onmouseout=()=>dbn.style.background='white';dbn.onclick=()=>{const tt=!isM?"Сообщение удалено администратором":m.imageUrl?`Фото удалено`:`Сообщение удалено`;update(ref(db,`chats/${cId}/messages/${k}`),{isDeleted:!0,text:tt,imageUrl:null});};ctxMenu.appendChild(dbn);}
+ctxMenu.style.display='flex';let px=x,py=y;if(px+180>window.innerWidth)px=window.innerWidth-190;if(py+ctxMenu.offsetHeight>window.innerHeight)py=window.innerHeight-ctxMenu.offsetHeight-10;ctxMenu.style.left=px+'px';ctxMenu.style.top=py+'px';}
 
-// Проверка пользователя при входе
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        currentUser = user;
-        // Получаем имя текущего пользователя из БД
-        const userRef = ref(db, 'users/' + user.uid);
-        get(userRef).then((snapshot) => {
-            if (snapshot.exists()) {
-                currentUserName = snapshot.val().displayName || "Без имени";
-            }
-        });
-        
-        // Запускаем прослушку сообщений только после авторизации
-        listenForMessages();
-    } else {
-        window.location.href = '../login/login.html';
-    }
-});
+onAuthStateChanged(auth,async u=>{if(u){const sP=await get(ref(db,'users/'+u.uid));if(sP.exists()&&sP.val().banned===!0){window.location.href="../../login/login.html";return;}cUser=u;initChat();}else window.location.href="../../login/login.html";});
 
-// Отправка текстового сообщения
-sendBtn.addEventListener('click', () => {
-    const text = messageInput.value.trim();
-    if (text === "") return;
+$('back-btn').onclick=()=>window.location.href="../../main/main.html";
 
-    sendMessageToDB(text, null);
-    messageInput.value = ""; // Очищаем поле
-});
-
-// Отправка по нажатию Enter на клавиатуре
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        sendBtn.click();
-    }
-});
-
-// Нажатие на скрепку открывает выбор файла
-attachBtn.addEventListener('click', () => {
-    imageInput.click();
-});
-
-// Загрузка файла в ImgBB при выборе
-imageInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Блокируем интерфейс, пока грузится картинка
-    attachBtn.classList.add('uploading');
-    
-    try {
-        const formData = new FormData();
-        formData.append('image', file);
-
-        const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            const imageUrl = data.data.url;
-            // Отправляем сообщение с картинкой (и текстом, если он был введен)
-            const text = messageInput.value.trim();
-            sendMessageToDB(text, imageUrl);
-            messageInput.value = ""; // Очищаем поле
-        } else {
-            alert("Ошибка загрузки изображения.");
-        }
-    } catch (error) {
-        console.error("Ошибка ImgBB:", error);
-        alert("Не удалось загрузить картинку.");
-    } finally {
-        attachBtn.classList.remove('uploading');
-        imageInput.value = ""; // Сбрасываем инпут
-    }
-});
-
-// Функция записи сообщения в Firebase Realtime DB
-function sendMessageToDB(text, imageUrl) {
-    const newMessageRef = push(messagesRef);
-    set(newMessageRef, {
-        uid: currentUser.uid,
-        senderName: currentUserName,
-        text: text,
-        imageUrl: imageUrl,
-        timestamp: Date.now()
-    });
+async function initChat(){
+  if(chatType==='private'){
+    cId=cUser.uid<targetId?`${cUser.uid}_${targetId}`:`${targetId}_${cUser.uid}`;
+    const s=await get(ref(db,'users/'+targetId)),u=s.exists()?s.val():{};
+    $('chat-name').textContent=u.displayName||u.phoneNumber||"Неизвестный";$('chat-avatar').src=u.photoURL||"https://via.placeholder.com/150/cccccc/ffffff?text=?";
+    $('call-btn').style.display='flex';$('group-manage-btn').style.display='none';
+    unsubStat=onValue(ref(db,`status/${targetId}`),st=>{const v=st.val();if(!v){$('chat-status').textContent='был(а) недавно';}else if(v.state==='online'){$('chat-status').innerHTML='<span style="color:#3390ec;">в сети</span>';}else{const d=new Date(v.last_seen||Date.now());$('chat-status').textContent=`был(а) в ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;$('chat-status').style.color='#707579';}});
+  }else{
+    cId=targetId;$('call-btn').style.display='none';
+    unsubGrp=onValue(ref(db,`groups/${targetId}`),s=>{if(!s.exists())return;const d=s.val();cGrpInfo=d.info||{};cGrpMembers=d.members||{};cGrpPerms=d.permissions||{};myRole=cGrpMembers[cUser.uid]||'member';$('chat-name').textContent=cGrpInfo.name;$('chat-avatar').src=cGrpInfo.photoURL||"https://via.placeholder.com/150/3390ec/ffffff?text=G";$('chat-status').textContent=`Участников: ${Object.keys(cGrpMembers).length}`;let canManage=myRole==='creator'||(myRole==='admin'&&(cGrpPerms[cUser.uid]?.manageUsers||cGrpPerms[cUser.uid]?.editInfo));$('group-manage-btn').style.display=canManage?'flex':'none';});
+    buildGroupModal();
+  }
+  loadMsgs();
 }
 
-// Прослушка новых сообщений из базы
-function listenForMessages() {
-    onChildAdded(messagesRef, (snapshot) => {
-        const data = snapshot.val();
-        displayMessage(data);
-    });
+function loadMsgs(){if(unsubMsgs)unsubMsgs();unsubMsgs=onValue(ref(db,`chats/${cId}/messages`),s=>{const c=$('messages-container');c.innerHTML='';s.forEach(ch=>{const m=ch.val(),k=ch.key;if(m.isSystem){const d=document.createElement('div');d.style.alignSelf='center';d.style.background='#ffebee';d.style.color='#c62828';d.style.padding='6px 12px';d.style.borderRadius='12px';d.style.margin='8px 0';d.style.fontSize='12px';d.style.fontWeight='bold';d.style.textAlign='center';d.innerText=m.text;c.appendChild(d);return;}const isM=m.senderId===cUser.uid;if(!isM&&m.status!=='read'&&!m.isDeleted&&chatType==='private')update(ref(db,`chats/${cId}/messages/${k}`),{status:'read'});const d=document.createElement('div');d.id='msg-'+k;d.style.alignSelf=isM?'flex-end':'flex-start';d.style.background=isM?'#effdde':'#fff';d.style.padding='8px 12px 20px 12px';d.style.borderRadius='12px';d.style.margin='4px 0';d.style.maxWidth='85%';d.style.minWidth='85px';d.style.boxShadow='0 1px 1px rgba(0,0,0,0.1)';d.style.position='relative';let pT;d.oncontextmenu=e=>{e.preventDefault();showCtx(e.clientX,e.clientY,k,m,isM);};d.ontouchstart=e=>{pT=setTimeout(()=>{showCtx(e.touches[0].clientX,e.touches[0].clientY,k,m,isM);},500);};d.ontouchend=()=>clearTimeout(pT);d.ontouchmove=()=>clearTimeout(pT);if(m.isDeleted){d.style.background=isM?'#f1f8e9':'#f5f5f5';d.innerHTML=`<span style="color:#888;font-style:italic;font-size:14px;">${m.text}</span>`;c.appendChild(d);return;}if(chatType==='group'&&!isM&&m.sName)d.innerHTML+=`<div style="font-size:12px;color:var(--primary-color);font-weight:bold;margin-bottom:2px;">${m.sName}</div>`;if(m.replyTo)d.innerHTML+=`<div class="reply-quote" onclick="let t=document.getElementById('msg-${m.replyTo.id}');if(t){t.scrollIntoView({behavior:'smooth',block:'center'});let ob=t.style.background;t.style.background='#fff59d';setTimeout(()=>t.style.background=ob,1200);}"><div class="reply-quote-name">${m.replyTo.name}</div><div class="reply-quote-text">${m.replyTo.text}</div></div>`;if(m.imageUrl)d.innerHTML+=`<img src="${m.imageUrl}" style="max-width:100%;border-radius:8px;display:block;margin-bottom:5px;">`;if(m.text)d.innerHTML+=`<span style="word-break:break-word;line-height:1.4;">${m.text}</span>`;let rH='';if(m.reactions){const cts={};Object.values(m.reactions).forEach(r=>{cts[r]=(cts[r]||0)+1;});const bgs=Object.entries(cts).map(([r,co])=>`<span class="reaction-badge" style="background:#f0f0f0;padding:2px 5px;border-radius:10px;font-size:12px;margin-right:3px;">${r} ${co>1?co:''}</span>`).join('');rH=`<div style="display:flex;flex-wrap:wrap;margin-top:4px;">${bgs}</div>`;}if(rH)d.innerHTML+=rH;let tS='';const dt=new Date(m.timestamp||Date.now());if(!isNaN(dt))tS=dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});let eH='';if(m.isEdited&&m.editTime){const eD=new Date(m.editTime);if(!isNaN(eD))eH=`<span style="font-style:italic;margin-right:5px;">изм. ${eD.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`;}let tk=isM?(m.status==='read'&&chatType==='private'?`<span class="material-icons" style="font-size:14px;color:#4caf50;">done_all</span>`:`<span class="material-icons" style="font-size:14px;color:#888;">done</span>`):'';d.innerHTML+=`<div style="position:absolute;bottom:4px;right:10px;display:flex;align-items:center;gap:3px;font-size:11px;color:#8a8a8a;white-space:nowrap;">${eH}<span>${tS}</span>${tk}</div>`;c.appendChild(d);});c.scrollTop=c.scrollHeight;});}
+
+function setupReply(id,d,n){replyMsg={id:id,text:d.text||(d.imageUrl?'📷 Фото':'Сообщение'),name:n};$('reply-preview-name').textContent=replyMsg.name;$('reply-preview-text').textContent=replyMsg.text;$('reply-preview-box').style.display='flex';$('message-input').focus();}
+function cancelReply(){replyMsg=null;$('reply-preview-box').style.display='none';}
+$('cancel-reply-btn').onclick=cancelReply;
+
+$('send-btn').onclick=async()=>{if(isMsgSending)return;const i=$('message-input'),t=i.value.trim();if(t||replyMsg){isMsgSending=!0;if(t){const btn=$('send-btn');btn.style.opacity='0.5';const isC=await checkMsg(t);btn.style.opacity='1';if(!isC){const uR=ref(db,'users/'+cUser.uid),sn=await get(uR);let w=(sn.exists()&&sn.val().warnings)||0;w++;await update(uR,{warnings:w});push(ref(db,`chats/${cId}/messages`),{isSystem:!0,text:`🚨 Отфильтровано (${w}/3)`,timestamp:serverTimestamp()});if(w>=3){await update(uR,{banned:!0,warnings:0});setTimeout(()=>window.location.reload(),1000);}i.value='';cancelReply();setTimeout(()=>isMsgSending=!1,500);return;}}i.value='';sendMsg(t);setTimeout(()=>isMsgSending=!1,500);}};
+$('message-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('send-btn').click();}});
+function sendMsg(t='',img=null){const tm=serverTimestamp();let sn=t||'📷 Фото';const mD={senderId:cUser.uid,sName:cUser.displayName||cUser.phoneNumber,text:t,imageUrl:img,timestamp:tm,status:'sent'};if(replyMsg){mD.replyTo=replyMsg;cancelReply();}push(ref(db,`chats/${cId}/messages`),mD);if(chatType==='private'){update(ref(db,`userChats/${cUser.uid}/${targetId}`),{timestamp:tm,lastMessage:sn});update(ref(db,`userChats/${targetId}/${cUser.uid}`),{timestamp:tm,lastMessage:sn});}else{Object.keys(cGrpMembers).forEach(uid=>{update(ref(db,`userChats/${uid}/${targetId}`),{timestamp:tm,lastMessage:sn});});}}
+
+$('attach-btn').onclick=()=>$('image-input').click();
+$('image-input').onchange=e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>{$('preview-image').src=ev.target.result;$('image-preview-modal').style.display='flex';};r.readAsDataURL(f);}};
+$('close-preview-btn').onclick=()=>$('image-preview-modal').style.display='none';
+$('send-image-btn').onclick=async()=>{const f=$('image-input').files[0],b=$('send-image-btn');b.disabled=!0;b.textContent='...';const fd=new FormData();fd.append('image',f);try{const r=await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,{method:'POST',body:fd}),d=await r.json();if(d.success){sendMsg('',d.data.url);$('image-preview-modal').style.display='none';}}catch(e){}b.disabled=!1;b.textContent='Отправить';};
+
+$('call-btn').onclick=async()=>{const rR=push(ref(db,'calls')),rId=rR.key;await set(rR,{caller:cUser.uid,receiver:targetId,status:'calling',timestamp:serverTimestamp()});window.location.href=`../../call/call.html?room=${rId}&mode=caller`;};
+
+// --- ГРУППОВОЕ УПРАВЛЕНИЕ (Генерируется динамически) ---
+function buildGroupModal(){
+  const gm=$('group-manage-modal');
+  gm.innerHTML=`<div class="modal-content" style="max-height:85vh;overflow-y:auto;"><h3 style="margin-bottom:10px;">Настройки группы</h3><div id="group-edit-info-section" style="display:none;flex-direction:column;gap:10px;margin-bottom:15px;"><label style="font-size:13px;color:#777;">Изменить название:</label><div style="display:flex;gap:5px;"><input type="text" id="edit-group-name-input" placeholder="Новое название" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;"><button class="btn primary-btn" id="save-group-name-btn" style="padding:8px 12px;"><span class="material-icons">check</span></button></div></div><div id="group-add-member-section" style="display:none;flex-direction:column;gap:10px;margin-bottom:15px;border-top:1px solid #eee;padding-top:15px;"><label style="font-size:13px;color:#777;">Добавить по номеру или @username:</label><div style="display:flex;gap:5px;"><input type="text" id="add-member-input" placeholder="@username" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;"><button class="btn primary-btn" id="add-member-btn" style="padding:8px 12px;"><span class="material-icons">person_add</span></button></div></div><div style="border-top:1px solid #eee;padding-top:15px;"><h4 style="margin-bottom:10px;">Участники:</h4><div id="group-members-list" style="display:flex;flex-direction:column;gap:10px;"></div></div><button class="btn" id="close-manage-group-btn" style="margin-top:20px;background:#f0f0f0;color:#333;">Закрыть</button></div>`;
+  $('group-manage-btn').onclick=()=>{gm.style.display='flex';let canE=myRole==='creator'||(myRole==='admin'&&cGrpPerms[cUser.uid]?.editInfo);$('group-edit-info-section').style.display=canE?'flex':'none';$('edit-group-name-input').value=cGrpInfo.name||'';let canM=myRole==='creator'||(myRole==='admin'&&cGrpPerms[cUser.uid]?.manageUsers);$('group-add-member-section').style.display=canM?'flex':'none';$('add-member-input').value='';renderMembers();};
+  $('close-manage-group-btn').onclick=()=>gm.style.display='none';
+  $('save-group-name-btn').onclick=()=>{const nn=$('edit-group-name-input').value.trim();if(nn)update(ref(db,`groups/${targetId}/info`),{name:nn});};
+  $('add-member-btn').onclick=async()=>{const q=$('add-member-input').value.trim();if(!q)return;const s=await get(ref(db,'users'));let fU=null;s.forEach(c=>{const u=c.val();if(q.startsWith('@')){if(u.username&&u.username.toLowerCase()===q.toLowerCase())fU=u;}else{const p=(u.phoneNumber||'').replace(/\D/g,'');if(p===q.replace(/\D/g,''))fU=u;}});if(fU){if(cGrpMembers[fU.uid]){alert("Уже в группе!");return;}await set(ref(db,`groups/${targetId}/members/${fU.uid}`),'member');await update(ref(db,`userChats/${fU.uid}/${targetId}`),{isGroup:!0,timestamp:serverTimestamp(),lastMessage:'Вас добавили в группу'});push(ref(db,`chats/${targetId}/messages`),{isSystem:!0,text:`${fU.displayName||fU.phoneNumber} присоединился к группе`,timestamp:serverTimestamp()});$('add-member-input').value='';renderMembers();}else alert("Не найден");};
 }
-
-// Отрисовка сообщения на экране
-function displayMessage(data) {
-    const isMyMessage = data.uid === currentUser.uid;
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message');
-    messageDiv.classList.add(isMyMessage ? 'my-message' : 'other-message');
-
-    let contentHTML = '';
-
-    // Имя отправителя (показываем только для чужих сообщений)
-    if (!isMyMessage) {
-        contentHTML += `<div class="message-sender">${data.senderName}</div>`;
-    }
-
-    // Если есть картинка
-    if (data.imageUrl) {
-        contentHTML += `<img src="${data.imageUrl}" class="message-image" alt="Прикрепленное изображение">`;
-    }
-
-    // Если есть текст
-    if (data.text) {
-        contentHTML += `<div>${data.text}</div>`;
-    }
-
-    // Время отправки
-    const date = new Date(data.timestamp);
-    const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    contentHTML += `<div class="message-time">${timeString}</div>`;
-
-    messageDiv.innerHTML = contentHTML;
-    chatMessages.appendChild(messageDiv);
-
-    // Прокручиваем чат в самый низ к новому сообщению
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-                                               }
+async function renderMembers(){const ml=$('group-members-list');ml.innerHTML='';for(let uid of Object.keys(cGrpMembers)){const us=await get(ref(db,`users/${uid}`)),u=us.exists()?us.val():{uid:uid,displayName:'Удален'};let role=cGrpMembers[uid],perms=cGrpPerms[uid]||{};const d=document.createElement('div');d.style.cssText='border:1px solid #eee;border-radius:10px;padding:12px;background:#fafafa;display:flex;flex-direction:column;gap:8px;';let isMe=uid===cUser.uid,canIEdit=myRole==='creator'||(myRole==='admin'&&cGrpPerms[cUser.uid]?.manageUsers);if(role==='creator'||isMe)canIEdit=!1;let html=`<div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>${u.displayName||u.phoneNumber}</strong> <span style="font-size:12px;color:#888;">${role==='creator'?'👑 Создатель':role==='admin'?'🛡️ Админ':'👤 Участник'}</span></div>`;if(canIEdit)html+=`<button onclick="kick('${uid}')" style="background:#ffebee;color:#c62828;border:1px solid #ffcdd2;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">Кикнуть</button>`;html+=`</div>`;if(canIEdit&&myRole==='creator'){html+=`<select onchange="chRole('${uid}',this.value)" style="padding:8px;border-radius:6px;border:1px solid #ccc;"><option value="member" ${role==='member'?'selected':''}>Участник</option><option value="admin" ${role==='admin'?'selected':''}>Администратор</option></select>`;if(role==='admin')html+=`<div style="padding:10px;background:white;border:1px dashed #ccc;border-radius:8px;display:flex;flex-direction:column;gap:8px;"><div style="display:flex;justify-content:space-between;font-size:13px;">Имя группы <input type="checkbox" onchange="chPerm('${uid}','editInfo',this.checked)" ${perms.editInfo?'checked':''}></div><div style="display:flex;justify-content:space-between;font-size:13px;">Удалять SMS <input type="checkbox" onchange="chPerm('${uid}','deleteMsgs',this.checked)" ${perms.deleteMsgs?'checked':''}></div><div style="display:flex;justify-content:space-between;font-size:13px;">Люди <input type="checkbox" onchange="chPerm('${uid}','manageUsers',this.checked)" ${perms.manageUsers?'checked':''}></div></div>`;}d.innerHTML=html;ml.appendChild(d);}}
+window.kick=async(uid)=>{if(confirm('Удалить?')){await remove(ref(db,`groups/${targetId}/members/${uid}`));await remove(ref(db,`groups/${targetId}/permissions/${uid}`));await remove(ref(db,`userChats/${uid}/${targetId}`));renderMembers();}};
+window.chRole=async(uid,r)=>{await set(ref(db,`groups/${targetId}/members/${uid}`),r);renderMembers();};
+window.chPerm=async(uid,p,v)=>{await set(ref(db,`groups/${targetId}/permissions/${uid}/${p}`),v);};
