@@ -2,8 +2,7 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-app
 const firebaseConfig={apiKey:"AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",authDomain:"kotogram-9b0b9.firebaseapp.com",databaseURL:"https://kotogram-9b0b9-default-rtdb.firebaseio.com",projectId:"kotogram-9b0b9",storageBucket:"kotogram-9b0b9.firebasestorage.app",messagingSenderId:"755607509917",appId:"1:755607509917:web:29b1b85eea516bde702d74"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
 
-// АПИ КЛЮЧИ
-const GROQ_API="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"; // НОВЫЙ КЛЮЧ
+const GROQ_API="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";
 const GEMINI_API="AIzaSyAvIDSBaggbPh5D6RbuD0uckfmndI9vypw";
 
 const params=new URLSearchParams(window.location.search), cType=params.get('type'), tId=params.get('id');
@@ -17,7 +16,24 @@ async function checkMsg(t){if(!t)return!0;try{const r=await fetch('https://api.g
 
 async function initChat(){
   if(isBot){
-    cId=`bot_${cUser.uid}`;$('chat-name').textContent="CatAI 🤖";$('chat-avatar').src="https://via.placeholder.com/150/9c27b0/ffffff?text=AI";$('chat-status').textContent="Всегда онлайн";$('call-btn').style.display='none';
+    cId=`bot_${cUser.uid}`;
+    $('chat-name').textContent="CatAI 🤖";
+    $('chat-avatar').src="https://via.placeholder.com/150/9c27b0/ffffff?text=AI";
+    $('chat-status').textContent="Всегда онлайн";
+    $('call-btn').style.display='none';
+    
+    // 🔥 ВКЛЮЧАЕМ И СЛУШАЕМ ТИКЕТЫ В РЕАЛЬНОМ ВРЕМЕНИ 🔥
+    $('ticket-counter').style.display='flex';
+    onValue(ref(db, 'users/' + cUser.uid), snap => {
+        if(snap.exists()){
+            uData = snap.val();
+            let today = new Date().toDateString();
+            let ticks = uData.catAITickets !== undefined ? uData.catAITickets : (uData.isPremium ? 30 : 10);
+            if(uData.lastTicketReset !== today) ticks = uData.isPremium ? 30 : 10;
+            $('ticket-num').textContent = ticks;
+        }
+    });
+
   }else if(!isGrp){
     cId=cUser.uid<tId?`${cUser.uid}_${tId}`:`${tId}_${cUser.uid}`;const s=await get(ref(db,'users/'+tId)),u=s.exists()?s.val():{};
     $('chat-name').textContent=(u.displayName||u.phoneNumber||"Неизвестный")+(u.emoji?` ${u.emoji}`:'');$('chat-avatar').src=u.photoURL||"https://via.placeholder.com/150";
@@ -56,7 +72,7 @@ $('send-btn').onclick=async()=>{
 // --- МОЗГИ CatAI ---
 async function processBot(txt){
     let snap=await get(ref(db,'users/'+cUser.uid)); let u=snap.val()||{};
-    let today=new Date().toDateString(); let ticks=u.catAITickets||0;
+    let today=new Date().toDateString(); let ticks=u.catAITickets!==undefined?u.catAITickets:(u.isPremium?30:10);
     
     // ЕЖЕДНЕВНОЕ ОБНОВЛЕНИЕ ТИКЕТОВ
     if(u.lastTicketReset!==today){
@@ -66,9 +82,9 @@ async function processBot(txt){
     
     let modelId=u.botModel||1; // 1-Groq, 2-Gemini
     
-    if(txt==='/start') return sendBot("Привет! Я CatAI 🤖.\nКоманды:\n/model 1 - Llama (1 тикет)\n/model 2 - Gemini (3 тикета)\nНапиши 'нарисуй [что-то]', чтобы создать фото (10 тикетов).\nУ вас тикетов: "+ticks);
+    if(txt==='/start') return sendBot("Привет! Я CatAI 🤖.\nКоманды:\n/model 1 - Llama (1 тикет)\n/model 2 - Gemini (3 тикета)\nНапиши 'нарисуй [что-то]', чтобы создать фото (10 тикетов).");
     if(txt.startsWith('/model ')){
-        let m=txt.split(' ')[1]; if(m==='1'||m==='2'){await update(ref(db,'users/'+cUser.uid),{botModel:parseInt(m)}); return sendBot(`✅ Модель: ${m==='1'?'Groq (1 тикет/сообщение)':'Gemini (3 тикета/сообщение)'}`);}
+        let m=txt.split(' ')[1]; if(m==='1'||m==='2'){await update(ref(db,'users/'+cUser.uid),{botModel:parseInt(m)}); return sendBot(`✅ Выбрана модель: ${m==='1'?'Groq (1 тикет/сообщение)':'Gemini (3 тикета/сообщение)'}`);}
     }
     
     let isImg=txt.toLowerCase().startsWith('нарисуй');
@@ -76,6 +92,7 @@ async function processBot(txt){
     
     if(ticks<cost) return sendBot(`❌ Не хватает тикетов. Нужно: ${cost}, у вас: ${ticks}. Ждите завтра или купите Premium.`);
     
+    // Списываем тикеты (UI обновится автоматически благодаря onValue)
     await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks-cost});
     
     try{
@@ -100,4 +117,3 @@ async function processBot(txt){
     }
 }
 function sendBot(txt){push(ref(db,`chats/${cId}/messages`),{senderId:'bot_catai',sName:'CatAI 🤖',text:txt,timestamp:serverTimestamp(),status:'sent'});}
-                                                                                               
