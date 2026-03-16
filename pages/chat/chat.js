@@ -16,32 +16,16 @@ async function checkMsg(t){if(!t)return!0;try{const r=await fetch('https://api.g
 
 async function initChat(){
   if(isBot){
-    cId=`bot_${cUser.uid}`;
-    $('chat-name').textContent="CatAI 🤖";
-    $('chat-avatar').src="https://via.placeholder.com/150/9c27b0/ffffff?text=AI";
-    $('chat-status').textContent="Всегда онлайн";
-    $('call-btn').style.display='none';
-    
-    // 🔥 ВКЛЮЧАЕМ И СЛУШАЕМ ТИКЕТЫ В РЕАЛЬНОМ ВРЕМЕНИ 🔥
+    cId=`bot_${cUser.uid}`;$('chat-name').textContent="CatAI 🤖";$('chat-avatar').src="https://via.placeholder.com/150/9c27b0/ffffff?text=AI";$('chat-status').textContent="Всегда онлайн";$('call-btn').style.display='none';
     $('ticket-counter').style.display='flex';
-    onValue(ref(db, 'users/' + cUser.uid), snap => {
-        if(snap.exists()){
-            uData = snap.val();
-            let today = new Date().toDateString();
-            let ticks = uData.catAITickets !== undefined ? uData.catAITickets : (uData.isPremium ? 30 : 10);
-            if(uData.lastTicketReset !== today) ticks = uData.isPremium ? 30 : 10;
-            $('ticket-num').textContent = ticks;
-        }
-    });
-
+    onValue(ref(db, 'users/' + cUser.uid), snap => {if(snap.exists()){uData = snap.val();let today = new Date().toDateString();let ticks = uData.catAITickets !== undefined ? uData.catAITickets : (uData.isPremium ? 30 : 10);if(uData.lastTicketReset !== today) ticks = uData.isPremium ? 30 : 10;$('ticket-num').textContent = ticks;}});
   }else if(!isGrp){
     cId=cUser.uid<tId?`${cUser.uid}_${tId}`:`${tId}_${cUser.uid}`;const s=await get(ref(db,'users/'+tId)),u=s.exists()?s.val():{};
     $('chat-name').textContent=(u.displayName||u.phoneNumber||"Неизвестный")+(u.emoji?` ${u.emoji}`:'');$('chat-avatar').src=u.photoURL||"https://via.placeholder.com/150";
     onValue(ref(db,`status/${tId}`),st=>{const v=st.val();$('chat-status').innerHTML=v?.state==='online'?'<span style="color:#3390ec">в сети</span>':v?`был(а) в ${new Date(v.last_seen).toLocaleTimeString()}`:'недавно';});
   }else{
     cId=tId;$('call-btn').style.display='none';
-    unGrp=onValue(ref(db,`groups/${tId}`),s=>{if(!s.exists())return;const d=s.val();cGrpM=d.members||{};cGrpP=d.permissions||{};myRole=cGrpM[cUser.uid]||'member';$('chat-name').textContent=d.info?.name||'Группа';$('chat-avatar').src=d.info?.photoURL||"https://via.placeholder.com/150/3390ec/ffffff?text=G";$('chat-status').textContent=`Участников: ${Object.keys(cGrpM).length}`;
-    if(myRole==='creator'||(myRole==='admin'&&(cGrpP[cUser.uid]?.manageUsers||cGrpP[cUser.uid]?.editInfo)))$('group-manage-btn').style.display='flex';});
+    unGrp=onValue(ref(db,`groups/${tId}`),s=>{if(!s.exists())return;const d=s.val();cGrpM=d.members||{};cGrpP=d.permissions||{};myRole=cGrpM[cUser.uid]||'member';$('chat-name').textContent=d.info?.name||'Группа';$('chat-avatar').src=d.info?.photoURL||"https://via.placeholder.com/150/3390ec/ffffff?text=G";$('chat-status').textContent=`Участников: ${Object.keys(cGrpM).length}`;if(myRole==='creator'||(myRole==='admin'&&(cGrpP[cUser.uid]?.manageUsers||cGrpP[cUser.uid]?.editInfo)))$('group-manage-btn').style.display='flex';});
   }
   loadMsgs();
 }
@@ -52,11 +36,7 @@ let h='';if(!isMe&&m.sName)h+=`<div style="font-size:12px;color:#3390ec;font-wei
 $('send-btn').onclick=async()=>{
     const t=$('message-input').value.trim();if(!t)return;$('message-input').value='';
     
-    // БОТ ЛОГИКА
-    if(isBot){
-        push(ref(db,`chats/${cId}/messages`),{senderId:cUser.uid,sName:cUser.displayName,text:t,timestamp:serverTimestamp(),status:'sent'});
-        await processBot(t); return;
-    }
+    if(isBot){push(ref(db,`chats/${cId}/messages`),{senderId:cUser.uid,sName:cUser.displayName,text:t,timestamp:serverTimestamp(),status:'sent'}); await processBot(t); return;}
     
     const isC=await checkMsg(t);if(!isC){
         let w=uData.warnings||0; w++; await update(ref(db,'users/'+cUser.uid),{warnings:w});
@@ -69,30 +49,25 @@ $('send-btn').onclick=async()=>{
     if(!isGrp){update(ref(db,`userChats/${cUser.uid}/${tId}`),{timestamp:serverTimestamp(),lastMessage:t});update(ref(db,`userChats/${tId}/${cUser.uid}`),{timestamp:serverTimestamp(),lastMessage:t});}else{Object.keys(cGrpM).forEach(u=>update(ref(db,`userChats/${u}/${tId}`),{timestamp:serverTimestamp(),lastMessage:t}));}
 };
 
-// --- МОЗГИ CatAI ---
+// --- МОЗГИ CatAI С УМНОЙ ОБРАБОТКОЙ ОШИБОК ---
 async function processBot(txt){
     let snap=await get(ref(db,'users/'+cUser.uid)); let u=snap.val()||{};
     let today=new Date().toDateString(); let ticks=u.catAITickets!==undefined?u.catAITickets:(u.isPremium?30:10);
     
-    // ЕЖЕДНЕВНОЕ ОБНОВЛЕНИЕ ТИКЕТОВ
-    if(u.lastTicketReset!==today){
-        ticks=u.isPremium?30:10;
-        await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks,lastTicketReset:today});
-    }
+    if(u.lastTicketReset!==today){ticks=u.isPremium?30:10; await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks,lastTicketReset:today});}
     
-    let modelId=u.botModel||1; // 1-Groq, 2-Gemini
+    let modelId=u.botModel||1; 
     
     if(txt==='/start') return sendBot("Привет! Я CatAI 🤖.\nКоманды:\n/model 1 - Llama (1 тикет)\n/model 2 - Gemini (3 тикета)\nНапиши 'нарисуй [что-то]', чтобы создать фото (10 тикетов).");
     if(txt.startsWith('/model ')){
-        let m=txt.split(' ')[1]; if(m==='1'||m==='2'){await update(ref(db,'users/'+cUser.uid),{botModel:parseInt(m)}); return sendBot(`✅ Выбрана модель: ${m==='1'?'Groq (1 тикет/сообщение)':'Gemini (3 тикета/сообщение)'}`);}
+        let m=txt.split(' ')[1]; if(m==='1'||m==='2'){await update(ref(db,'users/'+cUser.uid),{botModel:parseInt(m)}); return sendBot(`✅ Выбрана модель: ${m==='1'?'Groq (1 тикет)':'Gemini (3 тикета)'}`);}
     }
     
     let isImg=txt.toLowerCase().startsWith('нарисуй');
     let cost=isImg?10:(modelId===1?1:3);
     
-    if(ticks<cost) return sendBot(`❌ Не хватает тикетов. Нужно: ${cost}, у вас: ${ticks}. Ждите завтра или купите Premium.`);
+    if(ticks<cost) return sendBot(`❌ Не хватает тикетов. Нужно: ${cost}, у вас: ${ticks}.`);
     
-    // Списываем тикеты (UI обновится автоматически благодаря onValue)
     await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks-cost});
     
     try{
@@ -104,16 +79,21 @@ async function processBot(txt){
             let reply="Ошибка";
             if(modelId===1){
                 const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${GROQ_API}`,'Content-Type':'application/json'},body:JSON.stringify({model:"llama-3.3-70b-versatile",messages:[{role:"user",content:txt}]})});
-                const d=await r.json(); reply=d.choices[0].message.content;
+                const d=await r.json(); 
+                if(d.error) reply = "Ошибка Groq: " + d.error.message;
+                else reply=d.choices[0].message.content;
             }else{
                 const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:txt}]}]})});
-                const d=await r.json(); reply=d.candidates[0].content.parts[0].text;
+                const d=await r.json(); 
+                if(d.error) reply = "Ошибка Gemini: " + d.error.message;
+                else if(d.candidates) reply=d.candidates[0].content.parts[0].text;
+                else reply="Пустой ответ от Gemini";
             }
             sendBot(reply);
         }
     }catch(e){
-        await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks}); // Возврат тикетов при ошибке
-        sendBot("Сбой ИИ: "+e.message);
+        await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks}); // Возврат
+        sendBot("Сбой связи с сервером ИИ: "+e.message);
     }
 }
 function sendBot(txt){push(ref(db,`chats/${cId}/messages`),{senderId:'bot_catai',sName:'CatAI 🤖',text:txt,timestamp:serverTimestamp(),status:'sent'});}
