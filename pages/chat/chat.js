@@ -1,9 +1,10 @@
 import{initializeApp}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";import{getAuth,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";import{getDatabase,ref,onValue,push,set,serverTimestamp,get,remove,update}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+
 const firebaseConfig={apiKey:"AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",authDomain:"kotogram-9b0b9.firebaseapp.com",databaseURL:"https://kotogram-9b0b9-default-rtdb.firebaseio.com",projectId:"kotogram-9b0b9",storageBucket:"kotogram-9b0b9.firebasestorage.app",messagingSenderId:"755607509917",appId:"1:755607509917:web:29b1b85eea516bde702d74"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
 
 const GROQ_API="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";
-const GEMINI_API="AIzaSyAvIDSBaggbPh5D6RbuD0uckfmndI9vypw";
+const GEMINI_API="ВСТАВЬ_СВОЙ_КЛЮЧ_СЮДА"; // <--- ТВОЙ РАБОЧИЙ КЛЮЧ
 
 const params=new URLSearchParams(window.location.search), cType=params.get('type'), tId=params.get('id');
 let cUser=null,cId=null,uData={},unMsgs=null,unGrp=null,rep=null,isGrp=cType==='group',isBot=cType==='bot',cGrpM={},cGrpP={},myRole='member';
@@ -35,9 +36,7 @@ let h='';if(!isMe&&m.sName)h+=`<div style="font-size:12px;color:#3390ec;font-wei
 
 $('send-btn').onclick=async()=>{
     const t=$('message-input').value.trim();if(!t)return;$('message-input').value='';
-    
     if(isBot){push(ref(db,`chats/${cId}/messages`),{senderId:cUser.uid,sName:cUser.displayName,text:t,timestamp:serverTimestamp(),status:'sent'}); await processBot(t); return;}
-    
     const isC=await checkMsg(t);if(!isC){
         let w=uData.warnings||0; w++; await update(ref(db,'users/'+cUser.uid),{warnings:w});
         let limit=uData.isPremium?5:3;
@@ -49,27 +48,19 @@ $('send-btn').onclick=async()=>{
     if(!isGrp){update(ref(db,`userChats/${cUser.uid}/${tId}`),{timestamp:serverTimestamp(),lastMessage:t});update(ref(db,`userChats/${tId}/${cUser.uid}`),{timestamp:serverTimestamp(),lastMessage:t});}else{Object.keys(cGrpM).forEach(u=>update(ref(db,`userChats/${u}/${tId}`),{timestamp:serverTimestamp(),lastMessage:t}));}
 };
 
-// --- МОЗГИ CatAI ---
 async function processBot(txt){
     let snap=await get(ref(db,'users/'+cUser.uid)); let u=snap.val()||{};
     let today=new Date().toDateString(); let ticks=u.catAITickets!==undefined?u.catAITickets:(u.isPremium?30:10);
-    
     if(u.lastTicketReset!==today){ticks=u.isPremium?30:10; await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks,lastTicketReset:today});}
-    
     let modelId=u.botModel||1; 
-    
     if(txt==='/start') return sendBot("Привет! Я CatAI 🤖.\nКоманды:\n/model 1 - Llama (1 тикет)\n/model 2 - Gemini (3 тикета)\nНапиши 'нарисуй [что-то]', чтобы создать фото (10 тикетов).");
     if(txt.startsWith('/model ')){
         let m=txt.split(' ')[1]; if(m==='1'||m==='2'){await update(ref(db,'users/'+cUser.uid),{botModel:parseInt(m)}); return sendBot(`✅ Выбрана модель: ${m==='1'?'Groq (1 тикет)':'Gemini (3 тикета)'}`);}
     }
-    
     let isImg=txt.toLowerCase().startsWith('нарисуй');
     let cost=isImg?10:(modelId===1?1:3);
-    
     if(ticks<cost) return sendBot(`❌ Не хватает тикетов. Нужно: ${cost}, у вас: ${ticks}.`);
-    
     await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks-cost});
-    
     try{
         if(isImg){
             let p=txt.replace(/нарисуй/gi,'').trim();
@@ -83,19 +74,19 @@ async function processBot(txt){
                 if(d.error) reply = "Ошибка Groq: " + d.error.message;
                 else reply=d.choices[0].message.content;
             }else{
-                // ИСПРАВЛЕНА МОДЕЛЬ НА gemini-pro 
-                const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:txt}]}]})});
+                // 🔥 ФИНАЛЬНЫЙ ИСПРАВЛЕННЫЙ ЭНДПОИНТ 🔥
+                const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:txt}]}]})});
                 const d=await r.json(); 
                 if(d.error) reply = "Ошибка Gemini: " + d.error.message;
-                else if(d.candidates) reply=d.candidates[0].content.parts[0].text;
-                else reply="Пустой ответ от Gemini";
+                else if(d.candidates && d.candidates[0].content) reply=d.candidates[0].content.parts[0].text;
+                else reply="ИИ не смог дать ответ. Попробуйте другой вопрос.";
             }
             sendBot(reply);
         }
     }catch(e){
-        await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks}); // Возврат
+        await update(ref(db,'users/'+cUser.uid),{catAITickets:ticks});
         sendBot("Сбой связи с сервером ИИ: "+e.message);
     }
 }
 function sendBot(txt){push(ref(db,`chats/${cId}/messages`),{senderId:'bot_catai',sName:'CatAI 🤖',text:txt,timestamp:serverTimestamp(),status:'sent'});}
-              
+  
