@@ -2,69 +2,53 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KotoGram - Настройки</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
         body { background: #f4f4f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .settings-card { background: white; width: 100%; max-width: 400px; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .card { background: white; width: 100%; max-width: 400px; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         .header { display: flex; align-items: center; margin-bottom: 25px; gap: 15px; }
-        .back-btn { background: none; border: none; color: #3390ec; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .avatar-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 25px; }
-        .avatar-wrapper { position: relative; width: 100px; height: 100px; cursor: pointer; }
-        .avatar-wrapper img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #3390ec; }
-        .cam-icon { position: absolute; bottom: 0; right: 0; background: #3390ec; color: white; border-radius: 50%; padding: 6px; display: flex; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .input-group { margin-bottom: 15px; }
-        .input-group label { display: block; font-size: 13px; color: #707579; margin-bottom: 5px; margin-left: 5px; }
-        .input-group input { width: 100%; padding: 12px 15px; border: 1px solid #dfe1e5; border-radius: 10px; font-size: 16px; outline: none; transition: border 0.2s; }
-        .input-group input:focus { border-color: #3390ec; }
-        .save-btn { width: 100%; padding: 14px; background: #3390ec; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .save-btn:disabled { opacity: 0.7; cursor: not-allowed; }
-        .fix-btn { width: 100%; padding: 12px; background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        .error-text { color: #e53935; font-size: 13px; text-align: center; margin-top: 10px; min-height: 15px; }
+        .icon-btn { background: none; border: none; color: #3390ec; cursor: pointer; display: flex; }
+        .avatar-wrap { position: relative; width: 100px; height: 100px; margin: 0 auto 25px; cursor: pointer; }
+        .avatar-wrap img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #3390ec; }
+        .cam { position: absolute; bottom: 0; right: 0; background: #3390ec; color: white; border-radius: 50%; padding: 6px; display: flex; }
+        .group { margin-bottom: 15px; }
+        .group label { display: block; font-size: 13px; color: #777; margin-bottom: 5px; }
+        .group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; }
+        .group input:focus { border-color: #3390ec; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .primary { background: #3390ec; color: white; }
+        .fix-btn { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; margin-top: 15px; }
+        #err { text-align: center; font-size: 14px; margin-top: 10px; min-height: 20px; }
+        #err a { color: #fbc02d; font-weight: bold; text-decoration: none; }
     </style>
 </head>
 <body>
-
-    <div class="settings-card">
+    <div class="card">
         <div class="header">
-            <button class="back-btn" id="back-btn">
-                <span class="material-icons" style="font-size: 28px;">arrow_back</span>
-            </button>
-            <h2 style="font-size: 20px; color: #000;">Настройки профиля</h2>
+            <button class="icon-btn" id="back-btn"><span class="material-icons">arrow_back</span></button>
+            <h2>Настройки</h2>
         </div>
-
-        <div class="avatar-section">
-            <div class="avatar-wrapper" id="avatar-wrapper">
-                <img id="avatar-preview" src="https://via.placeholder.com/150/cccccc/ffffff?text=?">
-                <div class="cam-icon"><span class="material-icons" style="font-size: 18px;">camera_alt</span></div>
-            </div>
-            <input type="file" id="avatar-input" accept="image/*" style="display: none;">
+        <div class="avatar-wrap" id="av-wrap">
+            <img id="av-preview" src="https://via.placeholder.com/150">
+            <div class="cam"><span class="material-icons" style="font-size: 18px;">camera_alt</span></div>
         </div>
-
-        <div class="input-group">
-            <label>Имя</label>
-            <input type="text" id="name-input" placeholder="Введите имя">
-        </div>
-
-        <div class="input-group">
-            <label>@Username (для поиска)</label>
-            <input type="text" id="username-input" placeholder="@koteyca">
-        </div>
-
-        <div class="input-group">
-            <label>О себе</label>
-            <input type="text" id="bio-input" placeholder="Чем занимаетесь?">
-        </div>
-
-        <div id="error-msg" class="error-text"></div>
-
-        <button class="save-btn" id="save-btn">Сохранить изменения</button>
+        <input type="file" id="av-input" accept="image/*" style="display:none;">
         
-        <button class="fix-btn" id="fix-db-btn">🛠 Починить базу профиля</button>
-    </div>
+        <div class="group"><label>Имя</label><input type="text" id="name-in"></div>
+        <div class="group"><label>@Username</label><input type="text" id="user-in"></div>
+        <div class="group"><label>О себе</label><input type="text" id="bio-in"></div>
+        <div class="group">
+            <label>Эмодзи-статус <span style="color:#fbc02d;">(Premium)</span></label>
+            <input type="text" id="emoji-in" maxlength="2" placeholder="👑">
+        </div>
 
-    <script type="module" src="settings.js?v=2000"></script>
+        <div id="err"></div>
+        <button class="btn primary" id="save-btn">Сохранить</button>
+        <button class="btn fix-btn" id="fix-btn">🛠 Починить базу (Сброс)</button>
+    </div>
+    <script type="module" src="settings.js?v=2"></script>
 </body>
 </html>
