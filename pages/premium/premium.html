@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>KotoGram Premium</title>
+    <link rel="stylesheet" href="premium.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+    <div class="premium-container">
+        <header class="header">
+            <button class="icon-btn" id="back-btn"><span class="material-icons">arrow_back</span></button>
+            <h2>KotoGram Premium</h2>
+            <div style="width: 24px;"></div> </header>
+
+        <div class="premium-content">
+            <div class="hero">
+                <span class="material-icons premium-icon">workspace_premium</span>
+                <h1>Стань элитой.</h1>
+                <p>Разблокируй эксклюзивные функции, получи защиту от банов и доступ к нейросетям.</p>
+            </div>
+
+            <div class="features-list">
+                <div class="feature-item">
+                    <span class="material-icons" style="color: #ff9800;">emoji_emotions</span>
+                    <div>
+                        <strong>Кастомные эмодзи</strong>
+                        <p>Используй уникальные стикеры и реакции.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="material-icons" style="color: #4caf50;">verified</span>
+                    <div>
+                        <strong>Значок профиля</strong>
+                        <p>Установи любой эмодзи прямо возле своего ника.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="material-icons" style="color: #e53935;">shield</span>
+                    <div>
+                        <strong>Иммунитет модератора</strong>
+                        <p>У тебя будет 5 предупреждений вместо 3 до бана.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="material-icons" style="color: #9c27b0;">smart_toy</span>
+                    <div>
+                        <strong>Мощь CatAI</strong>
+                        <p>30 тикетов на общение с ботом вместо 10 базовых.</p>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-bottom: 15px;">Выберите план:</h3>
+            
+            <div class="plans-grid">
+                <div class="plan-card" data-plan="1_day" data-price="9.99">
+                    <div class="plan-title">1 ДЕНЬ</div>
+                    <div class="plan-price">9.99 <span>грн</span></div>
+                    <button class="buy-btn">Выбрать</button>
+                </div>
+                <div class="plan-card popular" data-plan="1_week" data-price="69.99">
+                    <div class="badge">Популярно</div>
+                    <div class="plan-title">1 НЕДЕЛЯ</div>
+                    <div class="plan-price">69.99 <span>грн</span></div>
+                    <button class="buy-btn primary">Выбрать</button>
+                </div>
+                <div class="plan-card" data-plan="1_month" data-price="299.99">
+                    <div class="plan-title">1 МЕСЯЦ</div>
+                    <div class="plan-price">299.99 <span>грн</span></div>
+                    <button class="buy-btn">Выбрать</button>
+                </div>
+                <div class="plan-card ultimate" data-plan="1_year" data-price="3200">
+                    <div class="plan-title" style="color: gold;">1 ГОД</div>
+                    <div class="plan-price" style="color: white;">3200 <span>грн</span></div>
+                    <button class="buy-btn gold">Навсегда в элите</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="success-modal" style="display: none;">
+        <div class="modal-content" style="text-align: center;">
+            <span class="material-icons" style="font-size: 50px; color: #4caf50;">check_circle</span>
+            <h3 style="margin: 10px 0;">Заявка отправлена!</h3>
+            <p style="font-size: 14px; color: #666;">Администратор проверит оплату и активирует вашу подписку. Статус появится в вашем профиле.</p>
+            <button class="btn primary-btn" id="close-modal-btn" style="margin-top: 15px; width: 100%;">Понятно</button>
+        </div>
+    </div>
+
+    <script type="module" src="premium.js?v=1000"></script>
+</body>
+</html>
