@@ -12,42 +12,31 @@
         
         <aside class="sidebar" id="sidebar">
             <header class="sidebar-header">
-                <button class="icon-btn" id="burger-menu-btn">
-                    <span class="material-icons">menu</span>
-                </button>
+                <button class="icon-btn" id="burger-menu-btn"><span class="material-icons">menu</span></button>
                 <div class="search-container">
                     <span class="material-icons search-icon">search</span>
                     <input type="text" id="search-input" placeholder="Поиск (@username или номер)">
                 </div>
             </header>
-
-            <div class="chat-list" id="chat-list">
-                <div class="info-message">Загрузка...</div>
-            </div>
-            
-            <div class="chat-list" id="search-results-container" style="display: none; background: #f9f9f9;">
-                <div style="padding: 15px; text-align: center; color: #888; font-size: 14px;">Введите запрос...</div>
-            </div>
-            
-            <button class="floating-btn" id="new-chat-btn">
-                <span class="material-icons">edit</span>
-            </button>
+            <div class="chat-list" id="chat-list"><div class="info-message">Загрузка...</div></div>
+            <div class="chat-list" id="search-results-container" style="display: none; background: #f9f9f9;"></div>
+            <button class="floating-btn" id="new-chat-btn"><span class="material-icons">group_add</span></button>
         </aside>
 
         <main class="chat-area" id="chat-area" style="position: relative;">
-            <div class="no-chat-selected" id="no-chat-selected">
-                <p>Выберите чат</p>
+            <div class="no-chat-selected" id="no-chat-selected" style="display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: #888;">
+                <p>Выберите чат слева</p>
             </div>
             
-            <iframe id="chat-iframe" src="" style="display: none; width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; z-index: 10;"></iframe>
+            <iframe id="chat-iframe" src="" style="display: none; width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; z-index: 10; background: #e7ebf0;"></iframe>
         </main>
         
         <div class="modal-overlay" id="create-group-modal" style="display: none;">
             <div class="modal-content">
-                <h3>Создать новую группу</h3>
-                <input type="text" id="new-group-name" placeholder="Название группы..." style="margin-top: 10px; width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                <h3>Создать группу</h3>
+                <input type="text" id="new-group-name" placeholder="Название..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-top: 10px;">
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button class="btn" id="close-create-group-btn" style="flex: 1; background: #f0f0f0; color: #333;">Отмена</button>
+                    <button class="btn" id="close-create-group-btn" style="flex: 1; background: #f0f0f0;">Отмена</button>
                     <button class="btn primary-btn" id="confirm-create-group-btn" style="flex: 1;">Создать</button>
                 </div>
             </div>
@@ -56,25 +45,19 @@
         <div class="drawer-overlay" id="drawer-overlay"></div>
         <div class="drawer" id="drawer">
             <div class="drawer-header">
-                <img id="drawer-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 65px; height: 65px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 2px solid white;">
-                <div class="drawer-user-info">
-                    <h3 id="drawer-display-name">Загрузка...</h3>
-                    <p id="drawer-phone-number">+00000000000</p>
-                    <p id="drawer-username" style="font-size: 13px; color: #e3f2fd; margin-top: 3px;"></p>
+                <img id="drawer-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" style="width: 65px; height: 65px; border-radius: 50%; object-fit: cover;">
+                <div class="drawer-user-info" style="margin-top: 10px;">
+                    <h3 id="drawer-display-name" style="color:white;">Загрузка...</h3>
+                    <p id="drawer-phone-number" style="color:#ddd; font-size:14px;"></p>
                 </div>
             </div>
             <div class="drawer-menu">
-                <button class="drawer-item" id="btn-settings">
-                    <span class="material-icons">account_circle</span> Мой профиль
-                </button>
+                <button class="drawer-item" id="btn-settings"><span class="material-icons">settings</span> Настройки</button>
                 <div style="height: 1px; background: #eee; margin: 10px 0;"></div>
-                <button class="drawer-item drawer-item-danger" id="drawer-logout-btn">
-                    <span class="material-icons">logout</span> Выйти
-                </button>
+                <button class="drawer-item" id="drawer-logout-btn" style="color: red;"><span class="material-icons" style="color: red;">logout</span> Выйти</button>
             </div>
         </div>
     </div>
-
-    <script type="module" src="main.js?v=iframe1"></script>
+    <script type="module" src="main.js?v=final1"></script>
 </body>
 </html>
