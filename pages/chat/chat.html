@@ -2,71 +2,57 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>KotoGram - Чат</title>
-    <link rel="stylesheet" href="chat.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+        body, html { width: 100%; height: 100%; background: #e7ebf0; overflow: hidden; }
+        .chat-container { display: flex; flex-direction: column; height: 100%; width: 100%; }
+        .chat-header { background: #fff; display: flex; align-items: center; padding: 10px 15px; height: 60px; border-bottom: 1px solid #ddd; }
+        .icon-btn { background: none; border: none; font-size: 24px; color: #555; cursor: pointer; display: flex; align-items: center; padding: 5px; }
+        .messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .input-area { background: #fff; padding: 10px; display: flex; align-items: center; gap: 10px; }
+        .input-area textarea { flex: 1; background: #f4f4f5; border: none; border-radius: 20px; padding: 10px 15px; resize: none; outline: none; font-size: 15px; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 350px; }
+        .btn { padding: 10px; width: 100%; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; font-weight: bold;}
+        .primary { background: #3390ec; color: white; }
+    </style>
 </head>
 <body>
     <div class="chat-container">
         <header class="chat-header">
-            <button class="icon-btn" id="back-btn">
-                <span class="material-icons">arrow_back</span>
-            </button>
-            <img id="chat-avatar" src="https://via.placeholder.com/150/cccccc/ffffff?text=?" class="avatar">
-            
-            <div class="chat-info">
-                <h3 id="chat-name">Загрузка...</h3>
-                <span id="chat-status"></span>
+            <button class="icon-btn" id="back-btn" style="margin-right: 10px;"><span class="material-icons">arrow_back</span></button>
+            <img id="chat-avatar" src="https://via.placeholder.com/150" style="width:40px;height:40px;border-radius:50%;margin-right:12px;object-fit:cover;">
+            <div style="flex:1;">
+                <h3 id="chat-name" style="margin:0;font-size:16px;">Загрузка...</h3>
+                <span id="chat-status" style="font-size:12px;color:#888;"></span>
             </div>
-            
-            <button class="icon-btn" id="group-manage-btn" style="display: none; color: #333;">
-                <span class="material-icons">admin_panel_settings</span>
-            </button>
-            
-            <button class="icon-btn" id="call-btn" style="color: #3390ec;">
-                <span class="material-icons">call</span>
-            </button>
+            <button class="icon-btn" id="group-manage-btn" style="display:none;"><span class="material-icons">admin_panel_settings</span></button>
+            <button class="icon-btn" id="call-btn" style="color:#3390ec;"><span class="material-icons">call</span></button>
         </header>
 
-        <div class="messages-container" id="messages-container">
-            <div style="text-align: center; color: #888; margin-top: 20px;">Загрузка сообщений...</div>
-        </div>
+        <div class="messages" id="messages-container"></div>
 
-        <div id="reply-preview-box" class="reply-box" style="display: none;">
-            <span class="material-icons" style="color: #3390ec; margin-right: 10px;">reply</span>
-            <div class="reply-content">
-                <div id="reply-preview-name" class="reply-name">Имя</div>
-                <div id="reply-preview-text" class="reply-text">Текст</div>
+        <div id="reply-box" style="display:none; background:#fff; padding:5px 15px; border-top:1px solid #ddd; align-items:center;">
+            <span class="material-icons" style="color:#3390ec;margin-right:10px;">reply</span>
+            <div style="flex:1;border-left:3px solid #3390ec;padding-left:8px;">
+                <div id="reply-name" style="font-size:12px;font-weight:bold;color:#3390ec;"></div>
+                <div id="reply-text" style="font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
             </div>
-            <button class="icon-btn" id="cancel-reply-btn">
-                <span class="material-icons">close</span>
-            </button>
+            <button class="icon-btn" id="cancel-reply-btn"><span class="material-icons">close</span></button>
         </div>
 
-        <footer class="chat-input-area">
-            <button class="icon-btn" id="attach-btn">
-                <span class="material-icons">attach_file</span>
-            </button>
-            <input type="file" id="image-input" accept="image/*" style="display: none;">
+        <footer class="input-area">
+            <button class="icon-btn" id="attach-btn"><span class="material-icons">attach_file</span></button>
+            <input type="file" id="image-input" accept="image/*" style="display:none;">
             <textarea id="message-input" placeholder="Сообщение..." rows="1"></textarea>
-            <button class="icon-btn send-btn" id="send-btn">
-                <span class="material-icons">send</span>
-            </button>
+            <button class="icon-btn" id="send-btn" style="color:#3390ec;"><span class="material-icons">send</span></button>
         </footer>
     </div>
 
-    <div class="modal-overlay" id="image-preview-modal" style="display: none;">
-        <div class="modal-content">
-            <img id="preview-image" src="" style="max-height: 50vh; object-fit: contain; width: 100%;">
-            <button class="btn primary-btn" id="send-image-btn" style="margin-top: 15px;">Отправить фото</button>
-            <button class="btn" id="close-preview-btn">Закрыть</button>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="group-manage-modal" style="display: none;">
-        </div>
-
-    <script type="module" src="chat.js?v=1000"></script>
+    <div class="modal" id="group-manage-modal"></div>
+    
+    <script type="module" src="chat.js?v=final1"></script>
 </body>
 </html>
