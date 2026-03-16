@@ -4,7 +4,7 @@ const firebaseConfig={apiKey:"AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",authDomai
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
 
 const GROQ_API="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";
-const GEMINI_API="ВСТАВЬ_СВОЙ_КЛЮЧ_СЮДА"; // <--- ТВОЙ РАБОЧИЙ КЛЮЧ
+const GEMINI_API="AIzaSyAvIDSBaggbPh5D6RbuD0uckfmndI9vypw"; // <--- ТВОЙ РАБОЧИЙ КЛЮЧ
 
 const params=new URLSearchParams(window.location.search), cType=params.get('type'), tId=params.get('id');
 let cUser=null,cId=null,uData={},unMsgs=null,unGrp=null,rep=null,isGrp=cType==='group',isBot=cType==='bot',cGrpM={},cGrpP={},myRole='member';
