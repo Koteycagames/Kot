@@ -49,7 +49,7 @@ $('send-btn').onclick=async()=>{
     if(!isGrp){update(ref(db,`userChats/${cUser.uid}/${tId}`),{timestamp:serverTimestamp(),lastMessage:t});update(ref(db,`userChats/${tId}/${cUser.uid}`),{timestamp:serverTimestamp(),lastMessage:t});}else{Object.keys(cGrpM).forEach(u=>update(ref(db,`userChats/${u}/${tId}`),{timestamp:serverTimestamp(),lastMessage:t}));}
 };
 
-// --- МОЗГИ CatAI С УМНОЙ ОБРАБОТКОЙ ОШИБОК ---
+// --- МОЗГИ CatAI ---
 async function processBot(txt){
     let snap=await get(ref(db,'users/'+cUser.uid)); let u=snap.val()||{};
     let today=new Date().toDateString(); let ticks=u.catAITickets!==undefined?u.catAITickets:(u.isPremium?30:10);
@@ -83,7 +83,8 @@ async function processBot(txt){
                 if(d.error) reply = "Ошибка Groq: " + d.error.message;
                 else reply=d.choices[0].message.content;
             }else{
-                const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:txt}]}]})});
+                // ИСПРАВЛЕНА МОДЕЛЬ НА gemini-pro 
+                const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:txt}]}]})});
                 const d=await r.json(); 
                 if(d.error) reply = "Ошибка Gemini: " + d.error.message;
                 else if(d.candidates) reply=d.candidates[0].content.parts[0].text;
@@ -97,3 +98,4 @@ async function processBot(txt){
     }
 }
 function sendBot(txt){push(ref(db,`chats/${cId}/messages`),{senderId:'bot_catai',sName:'CatAI 🤖',text:txt,timestamp:serverTimestamp(),status:'sent'});}
+              
