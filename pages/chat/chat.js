@@ -3,7 +3,7 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/9.22.1/firebase-app
 const firebaseConfig={apiKey:"AIzaSyBKp-HUZXSGSfBfEhl-HIjaC3Yflpqxg7s",authDomain:"kotogram-9b0b9.firebaseapp.com",databaseURL:"https://kotogram-9b0b9-default-rtdb.firebaseio.com",projectId:"kotogram-9b0b9",storageBucket:"kotogram-9b0b9.firebasestorage.app",messagingSenderId:"755607509917",appId:"1:755607509917:web:29b1b85eea516bde702d74"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
 
-const GROQ_API="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";
+const GROQ_API="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";
 const GEMINI_API="AIzaSyAvIDSBaggbPh5D6RbuD0uckfmndI9vypw"; // <--- ТВОЙ РАБОЧИЙ КЛЮЧ
 
 const params=new URLSearchParams(window.location.search), cType=params.get('type'), tId=params.get('id');
